@@ -11,9 +11,12 @@
       "schemas/projection.schema.json",
       "schemas/projection-map.schema.json",
       "fixtures/positive",
-      "fixtures/negative"
+      "fixtures/negative",
+      "fixtures/expected",
+      "fixtures/raw",
+      "ast/transparency.json"
     ],
-    "contentDigest": "99b7b3ceae5acf2c3e02291d591d55fd645ffafd5cbf5e3769c2849892476804"
+    "contentDigest": "72e43b74d801e673e7ace047ae8079367023b9d6ea267d3e7dc8b370cfa098d3"
   },
   "flix": {
     "tag": "v0.75.2",
