@@ -86,19 +86,33 @@ the same input. That difference is confined to the recovery lane, which §1 alre
 ### 3.6 `Expr.Expr` — an open question for flix-spec, not a decision here
 
 `fixtures/expected` keeps an `Expr.Expr` node wrapping every expression, and this grammar emits no
-such node. It is the first difference in roughly half of the fixtures that still differ.
+such node. It is the first difference in roughly half of the fixtures that still differ, and at
+531 of 3519 nodes it is 15.1% of the normalized suite.
 
-`Expr.Expr` is closed by `close(openBefore(lhs), TreeKind.Expr.Expr)` at twelve sites in
-`Parser2.scala` — the same idiom, at the same kind of position, as `Type.Type`, which
-`ast/transparency.json` _does_ elide with the reason that the type productions "re-close a single
-already-closed type node at every level of the precedence climb". The two are structurally
-parallel, and the `elide` rule is arity-sensitive — a node is only removed when it holds one child
-— so adding `Expr.Expr` would be safe by construction.
+Measured over `fixtures/raw` at the pin, `Expr.Expr` holds exactly one child at 530 of its 531
+occurrences and holds no token at 530 of them. It is produced by the same idiom as `Type.Type` —
+ten `close(openBefore(lhs), …)` calls climbing the expression precedence ladder
+(`Parser2.scala:1483, 1511, 1528, 1540, 1546, 1557, 1560, 1571, 1574, 1597`) plus one
+`close(mark, …)` closing the delimited production (`1952`), against `Type.Type`'s three at
+`3438, 3456, 3465` and one at `3630`. `ast/transparency.json` elides `Type.Type` on exactly that
+reasoning.
 
-The choice is therefore between proposing that rule upstream, where the argument can be checked
-against the reference's own structure, and emitting a wrapper node per expression here to match a
-shape that flix-spec may itself decide is an artifact. This repository's position is the former;
-until it is settled, the difference is measured rather than worked around.
+The one exception is real and worth stating rather than rounding away: in `d"…"` the wrapper holds
+both the `DebugInterpolator` token and the expression
+(`fixtures/expected/lexical__debug-interpolation.json`). So `Expr.Expr` does not satisfy the
+criterion `ast/transparency.json` states for its `elide` entries — "never hold more than one child
+and never hold a token". `Type.Type` satisfies it at 296 of 296 occurrences; `Expr.Expr` misses it
+once.
+
+That single exception does not make the rule unsafe, because `elide` is arity-sensitive: a node is
+replaced by its child only when it has exactly one, and kept otherwise. Applying it would remove
+530 wrappers and keep the debug-interpolation one, with no token lost. What it would require is
+widening the criterion in the note, which describes the current entries rather than a constraint
+the rule mechanically needs.
+
+This repository's position is to raise that upstream rather than emit a wrapper node per
+expression to match a shape flix-spec may itself decide is an artifact. Until it is settled, the
+difference is measured rather than worked around, and `test/conformance.test.ts` reports it.
 
 ## 4. What is not a divergence
 
