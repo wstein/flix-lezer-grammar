@@ -1,0 +1,12 @@
+node_modules/
+dist/
+
+# flix-spec, fetched at the commit in spec.pin.json by `npm run fetch-spec`. Never committed:
+# flix-spec owns those files and a copy here could only ever be a stale one.
+.spec/
+
+# Upstream Flix checkout used by `npm run corpus`; fetched, never committed.
+.corpus/
+
+*.tsbuildinfo
+.DS_Store

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "note": "What this repository is measured against. `flixSpec` is the commit of wstein/flix-spec that scripts/fetch-spec.mjs materialises into the gitignored .spec/ cache; `contentDigest` is a SHA-256 over the sorted (path, content-digest) pairs of the fetched subset, so the cache is verified by content rather than by a tarball byte-image that GitHub does not promise to keep stable. `flix` is the reference release flix-spec itself pins, copied here so the language version this grammar targets is readable without opening a second repository. Nothing under .spec/ is committed: flix-spec owns those files, and a second copy in this repository could only ever be a stale one.",
+  "flixSpec": {
+    "repository": "https://github.com/wstein/flix-spec",
+    "commit": "3864fbe29a07d0c145d831b9039403b290004d83",
+    "paths": [
+      "pin.json",
+      "ast/tokenkind.json",
+      "ast/treekind.json",
+      "schemas/projection.schema.json",
+      "schemas/projection-map.schema.json",
+      "fixtures/positive",
+      "fixtures/negative"
+    ],
+    "contentDigest": "99b7b3ceae5acf2c3e02291d591d55fd645ffafd5cbf5e3769c2849892476804"
+  },
+  "flix": {
+    "tag": "v0.75.2",
+    "commit": "40949531b4d42e5eaf2e4b9997537eaf793c24e7",
+    "oracleSha256": "a2697d875725a0dde6e793b8d54cb220e86167a6d49ec5f0ccb0832966c8c15a"
+  }
+}

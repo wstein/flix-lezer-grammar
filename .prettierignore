@@ -1,0 +1,9 @@
+dist/
+node_modules/
+.spec/
+.corpus/
+.remember/
+package-lock.json
+
+# Lezer grammar notation is not JavaScript; Prettier has no parser for it.
+*.grammar

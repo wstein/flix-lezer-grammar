@@ -1,0 +1,83 @@
+{
+  "name": "@wstein/lezer-flix",
+  "version": "0.1.0",
+  "description": "Lezer grammar for the Flix programming language, derived from the reference compiler's lexer and parser and checked against wstein/flix-spec.",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./projection": {
+      "types": "./dist/projection.d.ts",
+      "import": "./dist/projection.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "NOTICE.md"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wstein/flix-lezer-grammar.git"
+  },
+  "homepage": "https://github.com/wstein/flix-lezer-grammar",
+  "bugs": "https://github.com/wstein/flix-lezer-grammar/issues",
+  "keywords": [
+    "flix",
+    "lezer",
+    "codemirror",
+    "grammar",
+    "parser",
+    "syntax-highlighting"
+  ],
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "rollup -c",
+    "pretest": "npm run fetch-spec",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+    "fetch-spec": "node scripts/fetch-spec.mjs",
+    "corpus": "node scripts/parse-corpus.mjs"
+  },
+  "peerDependencies": {
+    "@lezer/common": "^1.5.2",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/lr": "^1.4.10"
+  },
+  "devDependencies": {
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.8",
+    "@eslint/js": "^10.0.1",
+    "@lezer/common": "^1.5.2",
+    "@lezer/generator": "^1.8.0",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/lr": "^1.4.10",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/node": "^26.2.0",
+    "ajv": "^8.20.0",
+    "eslint": "^10.8.1",
+    "prettier": "^3.9.6",
+    "rollup": "^4.62.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
