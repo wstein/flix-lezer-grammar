@@ -737,7 +737,14 @@ ExprUncheckedCast {
 }
 ExprUnsafe { kwUnsafe type (kwAs type)? ExprBlock }
 
-runOperand {
+// The operand layer `run` and `try` share. Both have a repeated tail — `with …` and `catch { … }`
+// — and admitting the whole of `expression` before a repetition makes the generator carry every
+// expression continuation through every repeat, which is the same cost that stops the fixpoint
+// lists from building. The classes below are exactly what is permitted: a literal or name, the
+// delimited forms, an ascription, and the postfix chain over those. Anything else — an infix
+// application, `if`, a unary operator, `throw` — has to be written in parentheses or a block.
+// Recorded as an intentional divergence in docs/CONFORMANCE.md.
+restrictedOperand {
   literal |
   ExprQName |
   ExprIntrinsic |
@@ -749,20 +756,19 @@ runOperand {
   ExprTuple |
   ExprAscribe |
   ExprBlock |
-  // `try g() catch { ... }` is a fixture, so the operand has to carry the postfix chain. Built
-  // over runOperand rather than expression, the way fixpointOperand is, so the narrow class stays
-  // narrow.
-  ExprApply { runOperand !postfix ArgumentList } |
-  ExprInvokeMethod { runOperand !postfix Dot identLower ArgumentList } |
-  ExprGetField { runOperand !postfix Dot identLower }
+  // `try g() catch { ... }` is a fixture, so the chain has to be here. Built over
+  // restrictedOperand rather than expression, the way fixpointOperand is, so it stays narrow.
+  ExprApply { restrictedOperand !postfix ArgumentList } |
+  ExprInvokeMethod { restrictedOperand !postfix Dot identLower ArgumentList } |
+  ExprGetField { restrictedOperand !postfix Dot identLower }
 }
 
-ExprRun { kwRun runOperand (!lambda kwWith runOperand)+ }
+ExprRun { kwRun restrictedOperand (!lambda kwWith restrictedOperand)+ }
 ExprHandler { kwHandler QName HandlerRuleList }
 HandlerRuleList { CurlyL (HandlerRule Comma?)* CurlyR }
 HandlerRule { kwDef identLower ParameterList Equal expression }
 
-ExprTry { kwTry runOperand (!lambda ExprTryCatchBodyFragment)* }
+ExprTry { kwTry restrictedOperand (!lambda ExprTryCatchBodyFragment)* }
 ExprTryCatchBodyFragment { kwCatch CurlyL (ExprTryCatchRuleFragment Comma?)* CurlyR }
 ExprTryCatchRuleFragment { kwCase identVariable Colon JavaQName ArrowThickR statement }
 ExprThrow { kwThrow !lambda expression }

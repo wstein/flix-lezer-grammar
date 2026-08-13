@@ -24,15 +24,9 @@ function errorCount(source: string): number {
  */
 const KNOWN_GAPS = new Map<string, string>([
   [
-    "datalog__query-with-select-and-from.flix",
-    "query clauses were restructured into fixed-order optionals to bound the tables; the shape " +
-      "no longer matches Parser2's",
-  ],
-  ["datalog__query-with-a-where-clause.flix", "same restructuring as query-with-select-and-from"],
-  ["datalog__query-piped-into-a-function.flix", "same restructuring, plus the |> continuation"],
-  [
-    "datalog__inject-several-relations.flix",
-    "the fixpointCommaAhead lookahead does not yet fire for every operand shape in the list",
+    "datalog__query-with-a-where-clause.flix",
+    "query clauses were restructured into fixed-order optionals to bound the tables, and a " +
+      "trailing `where` still binds to the enclosing declaration rather than the query",
   ],
   [
     "expressions__match-lambda.flix",
@@ -50,17 +44,57 @@ const KNOWN_GAPS = new Map<string, string>([
   ],
 ]);
 
+describe("fixpoint comma lookahead", () => {
+  // `fixpointCommaAheadToken` decides whether a `,` continues a fixpoint operand list or closes an
+  // enclosing one, by looking at what follows it. It has to recognise every character a
+  // `fixpointOperand` can start with, and it is consulted before `coreTokens`, so recognising one
+  // it cannot follow through on costs the plain `Comma` reading rather than falling back to it.
+  it.each([
+    ["uppercase name", "solve db, Other"],
+    ["lowercase name", "solve db, other"],
+    ["application", "inject map(g, pos), map(g, neg) into A/2, B/2"],
+    ["parenthesised", "solve db, (other)"],
+    ["block", "solve db, { other }"],
+    ["constraint set", "solve db, #{ A(1). }"],
+    ["past a line comment", "solve db, // note\n    Other"],
+    ["past a block comment", "solve db, /* note */ Other"],
+    ["past a nested block comment", "solve db, /* a /* b */ c */ Other"],
+  ])("continues the list before a %s", (_kind, body) => {
+    expect(errorCount(`def f(): Unit = ${body}`), body).toBe(0);
+  });
+
+  it("leaves an argument-list comma alone", () => {
+    // The `,` here closes `g`'s first argument; taking it as a list continuation would swallow it.
+    expect(errorCount("def f(): Unit = g(solve db, 1)")).toBe(0);
+  });
+});
+
 describe("bounded operand layers", () => {
-  // `run` and `try` take `runOperand` rather than `expression`, to keep the repeated `with` and
-  // `catch` tails from carrying every expression continuation. These are the shapes that layer has
-  // to keep accepting; `try g()` is also a fixture, and was rejected until the postfix chain was
-  // added to it.
-  it.each(["run f with g", "try f", "try g() catch { case e: E => 0 }", "run h() with i.j()"])(
-    "accepts %s",
-    (source) => {
-      expect(errorCount(`def f(): Unit = ${source}`), source).toBe(0);
-    },
-  );
+  // `run` and `try` take `restrictedOperand` rather than `expression`, to keep their repeated
+  // `with` and `catch` tails from carrying every expression continuation. The boundary is asserted
+  // in both directions, because a narrowing nobody tests is one nobody notices moving.
+  it.each([
+    "run f with g",
+    "try f",
+    "try g() catch { case e: E => 0 }",
+    "run h() with i.j()",
+    "run (a + b) with g", // the delimited form of a rejected operand
+    "run { throw e } with g",
+    "run (x: T) with g",
+  ])("accepts %s", (source) => {
+    expect(errorCount(`def f(): Unit = ${source}`), source).toBe(0);
+  });
+
+  // Rejected, and documented as an intentional divergence in docs/CONFORMANCE.md: the reference
+  // accepts these, and each becomes acceptable here by wrapping the operand in `(…)` or `{…}`.
+  it.each([
+    "run a + b with g",
+    "run if (c) a else b with g",
+    "run throw e with g",
+    "run -a with g",
+  ])("rejects %s, which the reference accepts", (source) => {
+    expect(errorCount(`def f(): Unit = ${source}`), source).toBeGreaterThan(0);
+  });
 });
 
 describe("positive fixtures", () => {

@@ -441,6 +441,47 @@ export const stringTokens = new ExternalTokenizer((input) => {
 });
 
 /**
+ * Advances `offset` past whitespace, line and doc comments, and nested block comments — the trivia
+ * `@skip` removes for the parser but that a raw character scan has to step over itself. Returns
+ * the offset of the first character that is not trivia, or -1 if the input ends inside it.
+ */
+function skipTrivia(input: InputStream, offset: number, limit: number): number {
+  for (;;) {
+    if (offset >= limit) return -1;
+    const ch = input.peek(offset);
+    if (ch < 0) return -1;
+    if (isWhitespace(ch)) {
+      offset++;
+      continue;
+    }
+    if (ch !== Ch.Slash) return offset;
+    const after = input.peek(offset + 1);
+    if (after === Ch.Slash) {
+      offset += 2;
+      while (offset < limit && input.peek(offset) >= 0 && input.peek(offset) !== Ch.Newline) {
+        offset++;
+      }
+      continue;
+    }
+    if (after !== Ch.Star) return offset;
+    let level = 1;
+    offset += 2;
+    while (offset < limit && level > 0) {
+      const c = input.peek(offset);
+      if (c < 0) return -1;
+      if (c === Ch.Slash && input.peek(offset + 1) === Ch.Star) {
+        level++;
+        offset += 2;
+      } else if (c === Ch.Star && input.peek(offset + 1) === Ch.Slash) {
+        level--;
+        offset += 2;
+      } else offset++;
+    }
+    if (level > 0) return -1;
+  }
+}
+
+/**
  * A zero-width token emitted where a lambda head begins.
  *
  * `(a, b) -> e` and `(a, b)` share an unbounded prefix, and so do `match p -> e` and
@@ -499,27 +540,10 @@ function scanForLambdaHead(input: InputStream, term: number): void {
       }
       case Ch.Slash: {
         const after = input.peek(offset + 1);
-        if (after === Ch.Slash) {
-          let i = offset + 2;
-          while (i < MAX_LOOKAHEAD && input.peek(i) >= 0 && input.peek(i) !== Ch.Newline) i++;
-          offset = i;
-          continue;
-        }
-        if (after !== Ch.Star) continue;
-        let level = 1;
-        let i = offset + 2;
-        while (i < MAX_LOOKAHEAD && level > 0) {
-          const c = input.peek(i);
-          if (c < 0) return;
-          if (c === Ch.Slash && input.peek(i + 1) === Ch.Star) {
-            level++;
-            i += 2;
-          } else if (c === Ch.Star && input.peek(i + 1) === Ch.Slash) {
-            level--;
-            i += 2;
-          } else i++;
-        }
-        offset = i - 1;
+        if (after !== Ch.Slash && after !== Ch.Star) continue;
+        const next = skipTrivia(input, offset, MAX_LOOKAHEAD);
+        if (next < 0) return;
+        offset = next - 1;
         continue;
       }
       case Ch.Minus: {
@@ -556,34 +580,21 @@ export const matchLambdaAheadToken = new ExternalTokenizer((input) => {
   scanForLambdaHead(input, matchLambdaAhead);
 });
 
-function isUpper(ch: number): boolean {
-  return ch >= 65 && ch <= 90;
-}
-
 export const fixpointCommaAheadToken = new ExternalTokenizer((input) => {
   if (input.next !== Ch.Comma) return;
-  let offset = 1;
-  while (offset < MAX_LOOKAHEAD) {
-    const ch = input.peek(offset);
-    if (ch < 0) return;
-    if (isWhitespace(ch)) {
-      offset++;
-      continue;
-    }
-    if (ch === Ch.Slash && input.peek(offset + 1) === Ch.Slash) {
-      offset += 2;
-      while (
-        offset < MAX_LOOKAHEAD &&
-        input.peek(offset) >= 0 &&
-        input.peek(offset) !== Ch.Newline
-      ) {
-        offset++;
-      }
-      continue;
-    }
-    if (isUpper(ch) || ch === Ch.Hash) {
-      input.acceptToken(fixpointCommaAhead, 0);
-    }
-    return;
-  }
+  const at = skipTrivia(input, 1, MAX_LOOKAHEAD);
+  if (at < 0) return;
+  const ch = input.peek(at);
+  // Every character a `fixpointOperand` can start with, and nothing else. Firing where no operand
+  // can follow is not harmless: this tokenizer is consulted before `coreTokens`, so a token the
+  // parser cannot use costs the plain `Comma` reading rather than falling through to it.
+  const opensOperand =
+    isLetter(ch) || // ExprQName
+    ch === Ch.Underscore ||
+    ch === Ch.Dollar ||
+    isMathName(ch) ||
+    ch === Ch.ParenL || // ExprParen
+    ch === Ch.CurlyL || // ExprBlock
+    (ch === Ch.Hash && input.peek(at + 1) === Ch.CurlyL); // ExprFixpointConstraintSet
+  if (opensOperand) input.acceptToken(fixpointCommaAhead, 0);
 });
