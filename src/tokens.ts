@@ -64,7 +64,6 @@ import {
   Tilde,
   lambdaAhead,
   matchLambdaAhead,
-  fixpointQueryAhead,
   fixpointCommaAhead,
 } from "./flix.grammar.terms";
 
@@ -549,88 +548,6 @@ export const lambdaAheadToken = new ExternalTokenizer((input) => {
  */
 export const matchLambdaAheadToken = new ExternalTokenizer((input) => {
   scanForLambdaHead(input, matchLambdaAhead);
-});
-
-function isDigit(ch: number): boolean {
-  return ch >= 48 && ch <= 57;
-}
-
-function scanForQueryClause(input: InputStream, term: number): void {
-  let depth = 0;
-  for (let offset = 0; offset < MAX_LOOKAHEAD; offset++) {
-    const ch = input.peek(offset);
-    if (ch < 0) return;
-    switch (ch) {
-      case Ch.CurlyL:
-      case Ch.ParenL:
-      case Ch.BracketL:
-        depth++;
-        continue;
-      case Ch.CurlyR:
-      case Ch.ParenR:
-      case Ch.BracketR:
-        if (depth === 0) return;
-        depth--;
-        continue;
-      case Ch.Semi:
-        if (depth === 0) return;
-        continue;
-      default:
-        if (depth === 0 && (ch === 115 || ch === 102 || ch === 119)) {
-          const before = input.peek(offset - 1);
-          if (before >= 0 && (isLetter(before) || before === Ch.Underscore)) continue;
-
-          if (ch === 115) {
-            // 'select'
-            if (
-              input.peek(offset + 1) === 101 &&
-              input.peek(offset + 2) === 108 &&
-              input.peek(offset + 3) === 101 &&
-              input.peek(offset + 4) === 99 &&
-              input.peek(offset + 5) === 116
-            ) {
-              const after = input.peek(offset + 6);
-              if (after < 0 || (!isLetter(after) && !isDigit(after) && after !== Ch.Underscore)) {
-                input.acceptToken(term, 0);
-                return;
-              }
-            }
-          } else if (ch === 102) {
-            // 'from'
-            if (
-              input.peek(offset + 1) === 114 &&
-              input.peek(offset + 2) === 111 &&
-              input.peek(offset + 3) === 109
-            ) {
-              const after = input.peek(offset + 4);
-              if (after < 0 || (!isLetter(after) && !isDigit(after) && after !== Ch.Underscore)) {
-                input.acceptToken(term, 0);
-                return;
-              }
-            }
-          } else if (ch === 119) {
-            // 'where'
-            if (
-              input.peek(offset + 1) === 104 &&
-              input.peek(offset + 2) === 101 &&
-              input.peek(offset + 3) === 114 &&
-              input.peek(offset + 4) === 101
-            ) {
-              const after = input.peek(offset + 5);
-              if (after < 0 || (!isLetter(after) && !isDigit(after) && after !== Ch.Underscore)) {
-                input.acceptToken(term, 0);
-                return;
-              }
-            }
-          }
-        }
-        continue;
-    }
-  }
-}
-
-export const fixpointQueryAheadToken = new ExternalTokenizer((input) => {
-  scanForQueryClause(input, fixpointQueryAhead);
 });
 
 function isUpper(ch: number): boolean {

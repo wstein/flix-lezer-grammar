@@ -54,6 +54,10 @@
 
 @external tokens lambdaAheadToken from "./tokens" { lambdaAhead }
 
+// Must precede coreTokens: in a fixpoint list both this zero-width token and a plain
+// Comma are valid, and the first tokenizer with an action wins.
+@external tokens fixpointCommaAheadToken from "./tokens" { fixpointCommaAhead }
+
 @external tokens stringTokens from "./tokens" {
   LiteralString,
   LiteralStringInterpolationL,
@@ -744,7 +748,13 @@ runOperand {
   ExprParen |
   ExprTuple |
   ExprAscribe |
-  ExprBlock
+  ExprBlock |
+  // `try g() catch { ... }` is a fixture, so the operand has to carry the postfix chain. Built
+  // over runOperand rather than expression, the way fixpointOperand is, so the narrow class stays
+  // narrow.
+  ExprApply { runOperand !postfix ArgumentList } |
+  ExprInvokeMethod { runOperand !postfix Dot identLower ArgumentList } |
+  ExprGetField { runOperand !postfix Dot identLower }
 }
 
 ExprRun { kwRun runOperand (!lambda kwWith runOperand)+ }
@@ -821,10 +831,6 @@ fixpointOperand {
   ExprFixpointConstraintSet |
   ExprApply { fixpointOperand !postfix ArgumentList }
 }
-@external tokens fixpointTokens from "./tokens" {
-  fixpointCommaAhead
-}
-
 fixpointExpressions { fixpointOperand (fixpointCommaAhead Comma fixpointOperand)* }
 fixpointNames { identUpper (fixpointCommaAhead Comma identUpper)* }
 
