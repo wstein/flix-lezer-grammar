@@ -23,6 +23,12 @@ So the two parsers cannot be structurally identical, and the differences are not
 | precedence climbing in code              | one `@precedence` block, generated into the tables   |
 | one error node kind per recovery site    | Lezer's single error node                            |
 
+The grammar also separates `run` and `try` from the general expression operand layer. Their
+repeated `with` and `catch` tails use a narrow set of atomic or delimited operands, since placing
+the complete recursive `expression` grammar at every tail boundary causes the LR automaton to grow
+without a practical bound. Parentheses and blocks retain the full expression language for complex
+operands without expanding the outer repetition's state space.
+
 ## 2. Layering
 
 ```text

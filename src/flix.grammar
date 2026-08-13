@@ -561,7 +561,12 @@ ExprStringInterpolation {
 statement { expression | ExprStatement }
 ExprStatement { expression !statement Semi statement }
 
-expression {
+// `run` and `try` have repeated tails. Their operands use a narrow layer: embedding the full
+// recursive expression grammar at every boundary makes LR-state construction intractable.
+// Complex operands remain available when grouped with parentheses or a block.
+expression { expressionOperand | ExprRun | ExprTry }
+
+expressionOperand {
   literal |
   ExprDebug |
   ExprQName |
@@ -599,9 +604,7 @@ expression {
   ExprCheckedTypeCast |
   ExprUncheckedCast |
   ExprUnsafe |
-  ExprRun |
   ExprHandler |
-  ExprTry |
   ExprThrow |
   ExprNew |
   ExprInvokeConstructor |
@@ -731,12 +734,26 @@ ExprUncheckedCast {
 }
 ExprUnsafe { kwUnsafe type (kwAs type)? ExprBlock }
 
-ExprRun { kwRun expression (!lambda kwWith expression)+ }
+runOperand {
+  literal |
+  ExprQName |
+  ExprIntrinsic |
+  ExprHole |
+  ExprHoleNamed |
+  ExprHoleVariable |
+  ExprStatic |
+  ExprParen |
+  ExprTuple |
+  ExprAscribe |
+  ExprBlock
+}
+
+ExprRun { kwRun runOperand (!lambda kwWith runOperand)+ }
 ExprHandler { kwHandler QName HandlerRuleList }
 HandlerRuleList { CurlyL (HandlerRule Comma?)* CurlyR }
 HandlerRule { kwDef identLower ParameterList Equal expression }
 
-ExprTry { kwTry expression (!lambda ExprTryCatchBodyFragment)* }
+ExprTry { kwTry runOperand (!lambda ExprTryCatchBodyFragment)* }
 ExprTryCatchBodyFragment { kwCatch CurlyL (ExprTryCatchRuleFragment Comma?)* CurlyR }
 ExprTryCatchRuleFragment { kwCase identVariable Colon JavaQName ArrowThickR statement }
 ExprThrow { kwThrow !lambda expression }

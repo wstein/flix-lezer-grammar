@@ -119,17 +119,6 @@ function isUserOp(ch: number): boolean {
   }
 }
 
-/** Lexer.scala:495 — isNameChar, used as the tail guard for keywords. */
-function isNameChar(ch: number): boolean {
-  return (
-    isLetter(ch) ||
-    (ch >= 48 && ch <= 57) ||
-    ch === Ch.Underscore ||
-    ch === 33 /* ! */ ||
-    ch === Ch.Dollar
-  );
-}
-
 /**
  * Java's `Character.isWhitespace`, restricted to what the reference lexer can encounter. Only the
  * decision "is this a space" matters here, never which one.

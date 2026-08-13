@@ -99,6 +99,13 @@ greedy comma list — multiplies the state count until table construction exhaus
 greedy list conflicts with an enclosing argument list, narrow the element class or add a
 lookahead token; do not reach for `!marker`.
 
+The same rule applies to keyword constructs with repeated tails. `run … with …` and `try … catch`
+enter through `expression`, but their operands use `runOperand`, a deliberately small layer of
+atomic and delimited expressions. A full `expression` at each tail boundary would make the
+generator carry every expression continuation through every repetition. Complex operands are
+therefore written in parentheses or blocks, which restores the full expression grammar within a
+delimiter while keeping the outer automaton bounded.
+
 Ambiguity markers are a last resort. Note that `~` resolves shift/reduce but did **not** resolve
 the pattern-versus-expression reduce/reduce conflicts here. Every marker that survives should have
 a comment saying what reconverges the split and after how many tokens.
@@ -124,9 +131,9 @@ Flix has three recovery kinds and Lezer has one error node.
 
 ## State of the work
 
-`main` holds the scaffold only. `wip/lexical-layer` holds the lexical layer and the full grammar;
-its table construction is not yet finishing, which is why it is not on `main` — `npm run typecheck`
-would fail there on the not-yet-generated `flix.grammar.terms` module.
+`main` holds the scaffold only. `wip/lexical-layer` holds the lexical layer and the full grammar.
+Its table construction now finishes with the configured 8 GB heap, but generated parser artifacts
+are not committed yet, so `npm run typecheck` still cannot resolve `flix.grammar.terms` there.
 
 Still to be written: `src/index.ts`, `src/highlight.ts`, `src/projection.ts`,
 `conformance/projection-map.json`, `scripts/parse-corpus.mjs` (the `npm run corpus` script),
