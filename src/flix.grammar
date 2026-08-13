@@ -310,7 +310,7 @@ Ident { NameLowercase | NameUppercase | NameMath | Underscore | GenericOperator 
 // cannot see. The markers let the parser split and reconverge at the `{`.
 QName { (identUpper ~qname Dot)* (identUpper | identLower) ~qname }
 // Parser2.scala:689 — NAME_QNAME is NameLowercase and NameUppercase only; a math name is
-// never a qualified-name segment, which is what keeps `let ⊆ = ...` a variable pattern.
+// never a qualified-name segment, which is what keeps `let ⊆ = ...` a variable Pattern.
 identUpper { Ident { NameUppercase } }
 identLower { Ident { NameLowercase } }
 
@@ -521,7 +521,8 @@ TypeCaseSet { AngleL commaSep<QName> AngleR }
 // Patterns
 // ---------------------------------------------------------------------------
 
-pattern {
+// Like Expr.Expr, the reference closes a Pattern.Pattern around every pattern.
+Pattern {
   PatternVariable |
   PatternLiteral |
   PatternTag |
@@ -536,12 +537,12 @@ PatternLiteral { literal }
 // Parser2.scala:700 — NAME_TAG is uppercase only, which is what tells `let x = ...` (a variable)
 // from `let Foo(x) = ...` (a tag).
 PatternTag { QNameUpper PatternTagBody? }
-PatternTagBody { ParenL commaSep<pattern> ParenR }
-PatternTuple { ParenL commaSep<pattern> ParenR }
-PatternRecord { CurlyL ~brace commaSep<PatternRecordLabelPattern> (Bar pattern)? CurlyR }
-PatternRecordLabelPattern { identLower (Equal pattern)? }
+PatternTagBody { ParenL commaSep<Pattern> ParenR }
+PatternTuple { ParenL commaSep<Pattern> ParenR }
+PatternRecord { CurlyL ~brace commaSep<PatternRecordLabelPattern> (Bar Pattern)? CurlyR }
+PatternRecordLabelPattern { identLower (Equal Pattern)? }
 PatternUnary { Minus literal }
-PatternFCons { pattern !cons ColonColon pattern }
+PatternFCons { Pattern !cons ColonColon Pattern }
 
 // ---------------------------------------------------------------------------
 // Literals
@@ -564,13 +565,19 @@ ExprStringInterpolation {
 // Expressions
 // ---------------------------------------------------------------------------
 
-statement { expression | ExprStatement }
-ExprStatement { expression !statement Semi statement }
+statement { Expr | ExprStatement }
+ExprStatement { Expr !statement Semi statement }
 
 // `run` and `try` have repeated tails. Their operands use a narrow layer: embedding the full
-// recursive expression grammar at every boundary makes LR-state construction intractable.
+// recursive Expr grammar at every boundary makes LR-state construction intractable.
 // Complex operands remain available when grouped with parentheses or a block.
-expression { expressionOperand | ExprRun | ExprTry }
+// The reference closes an Expr.Expr around every expression: ten times climbing the precedence
+// ladder and once at the end of the delimited production (Parser2.scala:1483..1597, 1952). It is
+// 15% of the normalized suite, and it is not a wrapper flix-spec elides -- at `d"..."` the node
+// holds the DebugInterpolator token beside its child, so it is not transparent by the criterion
+// ast/transparency.json applies. Producing it is therefore this grammar's job, not something the
+// projection map can declare away.
+Expr { expressionOperand | ExprRun | ExprTry }
 
 expressionOperand {
   literal |
@@ -646,18 +653,18 @@ ExprHoleVariable { HoleVariable }
 ExprStatic { kwStaticUppercase }
 ExprDebug { DebugInterpolator literal }
 
-// Parser2.scala:2086 — `(` opens a parenthesised expression, a tuple or an ascription, and the
-// reference tells them apart by the token *after* the first expression: `)` closes a paren, `:`
+// Parser2.scala:2086 — `(` opens a parenthesised Expr, a tuple or an ascription, and the
+// reference tells them apart by the token *after* the first Expr: `)` closes a paren, `:`
 // an ascription, `=` or `,` a tuple. That is one token of lookahead, so the shapes below only
 // have to make sure a one-element tuple is never a possibility: a tuple needs either a named
 // element or a second one.
-ExprParen { ParenL expression ParenR }
+ExprParen { ParenL Expr ParenR }
 ExprTuple {
   ParenL ParenR |
   ParenL ArgumentNamed (Comma argument)* ParenR |
   ParenL Argument (Comma argument)+ ParenR
 }
-ExprAscribe { ParenL expression Colon typeAndEffect ParenR }
+ExprAscribe { ParenL Expr Colon typeAndEffect ParenR }
 ExprOperatorAsLambda { ParenL Operator { operatorToken } ParenR }
 operatorToken {
   Plus | Minus | Star | Slash | AngleL | AngleR | AngledEqual | AngleLEqual | AngleREqual |
@@ -667,24 +674,24 @@ operatorToken {
 // `lambdaAhead` is a zero-width token the lookahead tokenizer emits only when a spaced `->`
 // follows this head, so the parser takes this branch deterministically instead of carrying a
 // tuple reading alongside it. See src/tokens.ts.
-ExprLambda { lambdaAhead lambdaParams ArrowThinRWhitespace expression }
+ExprLambda { lambdaAhead lambdaParams ArrowThinRWhitespace Expr }
 lambdaParams { ParameterList | Parameter }
 
 ExprBlock { CurlyL ~brace statement CurlyR }
 
 ExprRecordOperation {
-  CurlyL ~brace commaSep<RecordOp> (Bar expression)? CurlyR
+  CurlyL ~brace commaSep<RecordOp> (Bar Expr)? CurlyR
 }
 // Parser2.scala:1615 — `{` opens a block, a record literal or a record operation, and the
 // reference needs two non-comment tokens to tell them apart. The markers let the parser carry both
 // readings for exactly those two tokens.
 RecordOp {
-  Plus ~brace identLower Equal expression |
+  Plus ~brace identLower Equal Expr |
   Minus ~brace identLower |
-  identLower ~brace Equal expression
+  identLower ~brace Equal Expr
 }
 
-ExprLetMatch { kwLet pattern (Colon type)? Equal !statement statement }
+ExprLetMatch { kwLet Pattern (Colon type)? Equal !statement statement }
 ExprLocalDef {
   AnnotationList kwDef identFunction ParameterList (Colon typeAndEffect)?
   Equal !statement statement
@@ -692,57 +699,57 @@ ExprLocalDef {
 ExprScope { kwRegion identVariable (!lambda ExprBlock)? }
 
 ExprIfThenElse {
-  kwIf ParenL expression ParenR expression (!lambda kwElse expression)?
+  kwIf ParenL Expr ParenR Expr (!lambda kwElse Expr)?
 }
 
-ExprMatch { kwMatch expression MatchRuleList }
+ExprMatch { kwMatch Expr MatchRuleList }
 MatchRuleList { CurlyL (MatchRule Comma?)* CurlyR }
-MatchRule { kwCase pattern (kwIf expression)? ArrowThickR statement }
-ExprLambdaMatch { kwMatch matchLambdaAhead pattern ArrowThinRWhitespace expression }
+MatchRule { kwCase Pattern (kwIf Expr)? ArrowThickR statement }
+ExprLambdaMatch { kwMatch matchLambdaAhead Pattern ArrowThinRWhitespace Expr }
 
-ExprExtMatch { kwEMatch expression ExtMatchRuleList }
+ExprExtMatch { kwEMatch Expr ExtMatchRuleList }
 ExtMatchRuleList { CurlyL (ExtMatchRule Comma?)* CurlyR }
-ExtMatchRule { kwCase pattern ArrowThickR statement }
-ExprLambdaExtMatch { kwEMatch matchLambdaAhead pattern ArrowThinRWhitespace expression }
+ExtMatchRule { kwCase Pattern ArrowThickR statement }
+ExprLambdaExtMatch { kwEMatch matchLambdaAhead Pattern ArrowThinRWhitespace Expr }
 
-ExprRestrictableChoose { (kwChoose | KeywordChooseStar) expression MatchRuleList }
+ExprRestrictableChoose { (kwChoose | KeywordChooseStar) Expr MatchRuleList }
 
 ExprExtTag { kwXvar Ident { NameUppercase } (!lambda ArgumentList)? }
 ExprOpenVariant {
   kwOpenVariant QName |
-  kwOpenVariantAs QName expression
+  kwOpenVariantAs QName Expr
 }
 
 ForFragmentList {
   ParenL forFragment (Semi forFragment)* ParenR
 }
 forFragment { ForFragmentGuard | ForFragmentGenerator | ForFragmentLet }
-ForFragmentGuard { kwIf expression }
-ForFragmentGenerator { pattern ArrowThinL expression }
-ForFragmentLet { pattern Equal expression }
+ForFragmentGuard { kwIf Expr }
+ForFragmentGenerator { Pattern ArrowThinL Expr }
+ForFragmentLet { Pattern Equal Expr }
 
-ExprForeach { kwForeach ForFragmentList !lambda expression }
-ExprForMonadic { kwForM ForFragmentList kwYield expression }
-ExprForApplicative { kwForA ForFragmentList kwYield expression }
+ExprForeach { kwForeach ForFragmentList !lambda Expr }
+ExprForMonadic { kwForM ForFragmentList kwYield Expr }
+ExprForApplicative { kwForA ForFragmentList kwYield Expr }
 
 // Parser2.scala:2537 — an array literal requires an explicit region.
-ExprLiteralArray { ArrayHash CurlyL commaSep<expression> CurlyR ScopeName }
-ExprLiteralVector { VectorHash CurlyL commaSep<expression> CurlyR }
-ExprLiteralList { ListHash CurlyL commaSep<expression> CurlyR }
-ExprLiteralSet { SetHash CurlyL commaSep<expression> CurlyR }
+ExprLiteralArray { ArrayHash CurlyL commaSep<Expr> CurlyR ScopeName }
+ExprLiteralVector { VectorHash CurlyL commaSep<Expr> CurlyR }
+ExprLiteralList { ListHash CurlyL commaSep<Expr> CurlyR }
+ExprLiteralSet { SetHash CurlyL commaSep<Expr> CurlyR }
 ExprLiteralMap { MapHash CurlyL commaSep<ExprLiteralMapKeyValue> CurlyR }
-ExprLiteralMapKeyValue { expression ArrowThickR expression }
-ScopeName { At expression }
+ExprLiteralMapKeyValue { Expr ArrowThickR Expr }
+ScopeName { At Expr }
 
-ExprCheckedTypeCast { (kwCheckedCast | kwCheckedECast) ParenL expression ParenR }
+ExprCheckedTypeCast { (kwCheckedCast | kwCheckedECast) ParenL Expr ParenR }
 ExprUncheckedCast {
-  kwUncheckedCast ParenL expression (kwAs typeAndEffect)? ParenR
+  kwUncheckedCast ParenL Expr (kwAs typeAndEffect)? ParenR
 }
 ExprUnsafe { kwUnsafe type (kwAs type)? ExprBlock }
 
 // The operand layer `run` and `try` share. Both have a repeated tail — `with …` and `catch { … }`
-// — and admitting the whole of `expression` before a repetition makes the generator carry every
-// expression continuation through every repeat, which is the same cost that stops the fixpoint
+// — and admitting the whole of `Expr` before a repetition makes the generator carry every
+// Expr continuation through every repeat, which is the same cost that stops the fixpoint
 // lists from building. The classes below are exactly what is permitted: a literal or name, the
 // delimited forms, an ascription, and the postfix chain over those. Anything else — an infix
 // application, `if`, a unary operator, `throw` — has to be written in parentheses or a block.
@@ -760,7 +767,7 @@ restrictedOperand {
   ExprAscribe |
   ExprBlock |
   // `try g() catch { ... }` is a fixture, so the chain has to be here. Built over
-  // restrictedOperand rather than expression, the way fixpointOperand is, so it stays narrow.
+  // restrictedOperand rather than Expr, the way fixpointOperand is, so it stays narrow.
   ExprApply { restrictedOperand !postfix ArgumentList } |
   ExprInvokeMethod { restrictedOperand !postfix Dot identLower ArgumentList } |
   ExprGetField { restrictedOperand !postfix Dot identLower }
@@ -769,18 +776,18 @@ restrictedOperand {
 ExprRun { kwRun restrictedOperand (!lambda kwWith restrictedOperand)+ }
 ExprHandler { kwHandler QName HandlerRuleList }
 HandlerRuleList { CurlyL (HandlerRule Comma?)* CurlyR }
-HandlerRule { kwDef identLower ParameterList Equal expression }
+HandlerRule { kwDef identLower ParameterList Equal Expr }
 
 ExprTry { kwTry restrictedOperand (!lambda ExprTryCatchBodyFragment)* }
 ExprTryCatchBodyFragment { kwCatch CurlyL (ExprTryCatchRuleFragment Comma?)* CurlyR }
 ExprTryCatchRuleFragment { kwCase identVariable Colon JavaQName ArrowThickR statement }
-ExprThrow { kwThrow !lambda expression }
+ExprThrow { kwThrow !lambda Expr }
 
 ExprNew {
   kwNew type ScopeName CurlyL commaSep<ExprStructPutFieldInit> CurlyR |
   kwNew type CurlyL (ExprJvmMethod | ExprJvmConstructor)* CurlyR
 }
-ExprStructPutFieldInit { identLower Equal expression }
+ExprStructPutFieldInit { identLower Equal Expr }
 ExprJvmMethod {
   AnnotationList kwDef Ident { NameLowercase | NameUppercase | NameMath }
   ParameterList Colon typeAndEffect Equal statement
@@ -792,14 +799,14 @@ ExprInvokeConstructor { kwNew type ArgumentList }
 
 ExprInvokeSuper { kwSuper (Dot Ident { NameLowercase | NameUppercase })? ArgumentList }
 
-ExprSpawn { kwSpawn expression ScopeName }
-ExprParYield { kwPar ParYieldFragmentList? kwYield expression }
+ExprSpawn { kwSpawn Expr ScopeName }
+ExprParYield { kwPar ParYieldFragmentList? kwYield Expr }
 ParYieldFragmentList { ParenL ParYieldFragment (Semi ParYieldFragment)* ParenR }
-ParYieldFragment { pattern ArrowThinL expression }
+ParYieldFragment { Pattern ArrowThinL Expr }
 
 ExprSelect { kwSelect CurlyL ExprSelectRuleFragment* CurlyR }
 ExprSelectRuleFragment {
-  kwCase identVariable ArrowThinL QName ParenL expression ParenR ArrowThickR statement |
+  kwCase identVariable ArrowThinL QName ParenL Expr ParenR ArrowThickR statement |
   kwCase Ident { Underscore } ArrowThickR statement
 }
 
@@ -816,22 +823,22 @@ ExprFixpointConstraint {
   PredicateHead (ColonMinus commaSep1<predicateBody>)? DotWhiteSpace
 }
 PredicateHead { Ident { NameUppercase } (!lambda PredicateTermList)? }
-PredicateTermList { ParenL commaSep<expression> (Semi expression)? ParenR }
+PredicateTermList { ParenL commaSep<Expr> (Semi Expr)? ParenR }
 predicateBody { PredicateGuard | PredicateFunctional | PredicateAtom }
-PredicateGuard { kwIf ParenL expression ParenR }
+PredicateGuard { kwIf ParenL Expr ParenR }
 PredicateFunctional {
-  kwLet (identVariable | ParenL commaSep<identVariable> ParenR) Equal expression
+  kwLet (identVariable | ParenL commaSep<identVariable> ParenR) Equal Expr
 }
 PredicateAtom {
   kwNot? kwFix? Ident { NameUppercase } (!lambda PredicatePatternList)?
 }
-PredicatePatternList { ParenL commaSep<pattern> (Semi pattern)? ParenR }
+PredicatePatternList { ParenL commaSep<Pattern> (Semi Pattern)? ParenR }
 
 // The list is greedy: a `,` after it continues the list rather than closing an enclosing
 // argument list, which is what the reference does by parsing it with `zeroOrMore`.
-// The operand list of a fixpoint expression is a comma-separated list sitting where an enclosing
-// argument list may also use commas. Admitting a full expression on each side of that comma makes
-// the LR automaton carry the choice through every expression state, and the tables stop building
+// The operand list of a fixpoint Expr is a comma-separated list sitting where an enclosing
+// argument list may also use commas. Admitting a full Expr on each side of that comma makes
+// the LR automaton carry the choice through every Expr state, and the tables stop building
 // altogether. The operands real code uses are names, applications, parenthesised expressions and
 // constraint sets, so that is the class accepted here: anything else has to be parenthesised.
 // Recorded in docs/CONFORMANCE.md.
@@ -857,20 +864,20 @@ PredicateAndArity { Ident { NameUppercase } Slash LiteralInt }
 ExprFixpointQuery {
   kwQuery fixpointExpressions ExprFixpointSelect? ExprFixpointFromFragment? ExprFixpointWhere?
 }
-// The select operand stays bounded: admitting `expression` here lets it be another query, and a
+// The select operand stays bounded: admitting `Expr` here lets it be another query, and a
 // following `where` then belongs to either the inner or the outer one. `where` itself has no such
 // problem — nothing can follow it that a nested query could also claim — so it takes the full
-// expression grammar, which is what `where x < y` needs.
+// Expr grammar, which is what `where x < y` needs.
 ExprFixpointSelect { kwSelect queryOperand }
 queryOperand { fixpointOperand | ExprTuple | literal }
 ExprFixpointFromFragment { kwFrom PredicateAtom (fixpointCommaAhead Comma PredicateAtom)* }
-ExprFixpointWhere { kwWhere expression }
+ExprFixpointWhere { kwWhere Expr }
 ExprFixpointQueryWithProvenance {
   kwPQuery fixpointExpressions kwSelect PredicateHead kwWith CurlyL commaSep<identUpper> CurlyR
 }
 
 ExprFixpointLambda {
-  HashParenL commaSep<PredicateParam> ParenR ArrowThinRWhitespace expression
+  HashParenL commaSep<PredicateParam> ParenR ArrowThinRWhitespace Expr
 }
 PredicateParam {
   Ident { NameUppercase } (ParenL commaSep<type> (Semi type)? ParenR)?
@@ -882,38 +889,38 @@ PredicateParam {
 
 ArgumentList { ParenL commaSep<argument> ParenR }
 argument { Argument | ArgumentNamed }
-Argument { expression }
-ArgumentNamed { expression Equal expression }
+Argument { Expr }
+ArgumentNamed { Expr Equal Expr }
 
-ExprApply { expression !postfix ArgumentList }
-ExprInvokeMethod { expression !postfix Dot identLower ArgumentList }
-ExprGetField { expression !postfix Dot identLower }
+ExprApply { Expr !postfix ArgumentList }
+ExprInvokeMethod { Expr !postfix Dot identLower ArgumentList }
+ExprGetField { Expr !postfix Dot identLower }
 // Record selection is `r#label`; `.label` is Java field access.
-ExprRecordSelect { expression !postfix Hash identLower }
-ExprStructGet { expression !postfix ArrowThinRTight identLower }
-ExprStructPut { expression !postfix ArrowThinRTight identLower Equal expression }
-ExprIndex { expression !postfix BracketL expression BracketR }
-ExprIndexMut { expression !postfix BracketL expression BracketR Equal expression }
+ExprRecordSelect { Expr !postfix Hash identLower }
+ExprStructGet { Expr !postfix ArrowThinRTight identLower }
+ExprStructPut { Expr !postfix ArrowThinRTight identLower Equal Expr }
+ExprIndex { Expr !postfix BracketL Expr BracketR }
+ExprIndexMut { Expr !postfix BracketL Expr BracketR Equal Expr }
 
 ExprUnary {
-  Operator { kwDiscard } !discard expression |
-  Operator { kwLazy | kwForce } !lazyForce expression |
-  Operator { Plus | Minus } ~brace !unarySign expression |
-  Operator { kwNot } !not expression
+  Operator { kwDiscard } !discard Expr |
+  Operator { kwLazy | kwForce } !lazyForce Expr |
+  Operator { Plus | Minus } ~brace !unarySign Expr |
+  Operator { kwNot } !not Expr
 }
 
 ExprBinary {
-  expression !cons Operator { ColonColon | ColonColonColon } expression |
-  expression !infixFn Operator { Tick QName Tick } expression |
-  expression !instanceOf Operator { kwInstanceOf } expression |
-  expression !or Operator { kwOr } expression |
-  expression !and Operator { kwAnd } expression |
-  expression !equality Operator { EqualEqual | AngledEqual | BangEqual } expression |
-  expression !comparison Operator { AngleL | AngleR | AngleLEqual | AngleREqual } expression |
-  expression !additive Operator { Plus | Minus } expression |
-  expression !multiplicative Operator { Star | Slash } expression |
-  expression !angledPlus Operator { AngledPlus } expression |
-  expression !userOp Operator { GenericOperator | NameMath } expression
+  Expr !cons Operator { ColonColon | ColonColonColon } Expr |
+  Expr !infixFn Operator { Tick QName Tick } Expr |
+  Expr !instanceOf Operator { kwInstanceOf } Expr |
+  Expr !or Operator { kwOr } Expr |
+  Expr !and Operator { kwAnd } Expr |
+  Expr !equality Operator { EqualEqual | AngledEqual | BangEqual } Expr |
+  Expr !comparison Operator { AngleL | AngleR | AngleLEqual | AngleREqual } Expr |
+  Expr !additive Operator { Plus | Minus } Expr |
+  Expr !multiplicative Operator { Star | Slash } Expr |
+  Expr !angledPlus Operator { AngledPlus } Expr |
+  Expr !userOp Operator { GenericOperator | NameMath } Expr
 }
 
 // ---------------------------------------------------------------------------

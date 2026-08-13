@@ -17,7 +17,7 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
-**Oracle lane: 3 of 116 fixtures match the reference tree node for node.** They are pinned by name
+**Oracle lane: 46 of 116 fixtures match the reference tree node for node.** They are pinned by name
 in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
 fixture stops matching. The list only moves up.
 
@@ -83,36 +83,23 @@ a free dot and so on, each covering the whole malformed region. This grammar doe
 malformed input goes through Lezer's error recovery instead, which produces a different shape for
 the same input. That difference is confined to the recovery lane, which §1 already does not claim.
 
-### 3.6 `Expr.Expr` — an open question for flix-spec, not a decision here
+### 3.6 `Expr.Expr` and `Pattern.Pattern` are produced, not declared away
 
-`fixtures/expected` keeps an `Expr.Expr` node wrapping every expression, and this grammar emits no
-such node. It is the first difference in roughly half of the fixtures that still differ, and at
-531 of 3519 nodes it is 15.1% of the normalized suite.
+The reference closes an `Expr.Expr` around every expression and a `Pattern.Pattern` around every
+pattern, and this grammar now does the same. Neither is a divergence; the entry is kept because the
+reasoning behind it is worth not repeating.
 
-Measured over `fixtures/raw` at the pin, `Expr.Expr` holds exactly one child at 530 of its 531
-occurrences and holds no token at 530 of them. It is produced by the same idiom as `Type.Type` —
-ten `close(openBefore(lhs), …)` calls climbing the expression precedence ladder
-(`Parser2.scala:1483, 1511, 1528, 1540, 1546, 1557, 1560, 1571, 1574, 1597`) plus one
-`close(mark, …)` closing the delimited production (`1952`), against `Type.Type`'s three at
-`3438, 3456, 3465` and one at `3630`. `ast/transparency.json` elides `Type.Type` on exactly that
-reasoning.
+The tempting move was to treat `Expr.Expr` as a wrapper flix-spec ought to elide, on the grounds
+that it is produced by the same `close(openBefore(lhs), …)` precedence-climb idiom as `Type.Type`,
+which `ast/transparency.json` does elide. Measurement says otherwise. `flix-spec`'s
+`proposeTransparency` requires that _every_ occurrence of a kind have at most one child and never a
+token child, and `Expr.Expr` misses it exactly once: in `d"…"` it holds the `DebugInterpolator`
+token beside its child. That criterion is a claim about the production, not about occurrences —
+relaxing it to "wherever the rule fires" makes the same tool propose `Root` and `ParameterList`,
+which is how one can tell the original was load bearing.
 
-The one exception is real and worth stating rather than rounding away: in `d"…"` the wrapper holds
-both the `DebugInterpolator` token and the expression
-(`fixtures/expected/lexical__debug-interpolation.json`). So `Expr.Expr` does not satisfy the
-criterion `ast/transparency.json` states for its `elide` entries — "never hold more than one child
-and never hold a token". `Type.Type` satisfies it at 296 of 296 occurrences; `Expr.Expr` misses it
-once.
-
-That single exception does not make the rule unsafe, because `elide` is arity-sensitive: a node is
-replaced by its child only when it has exactly one, and kept otherwise. Applying it would remove
-530 wrappers and keep the debug-interpolation one, with no token lost. What it would require is
-widening the criterion in the note, which describes the current entries rather than a constraint
-the rule mechanically needs.
-
-This repository's position is to raise that upstream rather than emit a wrapper node per
-expression to match a shape flix-spec may itself decide is an artifact. Until it is settled, the
-difference is measured rather than worked around, and `test/conformance.test.ts` reports it.
+So the reference reuses one kind for two productions, and a consumer has to produce both. Doing it
+moved the oracle lane from 3 of 116 fixtures to 27, and `Pattern.Pattern` took it to 36.
 
 ## 4. What is not a divergence
 
