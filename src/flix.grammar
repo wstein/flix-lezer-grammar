@@ -35,7 +35,6 @@
   typeRvAddSub @left,
   typeArrow @right,
   typeEffect @left,
-  fixpoint @left,
   lambda @right,
   statement @right,
   decl @cut
@@ -822,31 +821,28 @@ fixpointOperand {
   ExprFixpointConstraintSet |
   ExprApply { fixpointOperand !postfix ArgumentList }
 }
-fixpointExpressions { fixpointOperand | fixpointExpressions !fixpoint Comma fixpointOperand }
-fixpointNames { identUpper | fixpointNames !fixpoint Comma identUpper }
+@external tokens fixpointTokens from "./tokens" {
+  fixpointCommaAhead
+}
+
+fixpointExpressions { fixpointOperand (fixpointCommaAhead Comma fixpointOperand)* }
+fixpointNames { identUpper (fixpointCommaAhead Comma identUpper)* }
 
 ExprFixpointSolveWithProject {
   kwSolve fixpointExpressions (!lambda kwProject fixpointNames)?
 }
 ExprFixpointSolveWithProvenance { kwPSolve fixpointExpressions }
 ExprFixpointInject {
-  kwInject fixpointExpressions kwInto PredicateAndArity (!fixpoint Comma PredicateAndArity)*
+  kwInject fixpointExpressions kwInto PredicateAndArity (fixpointCommaAhead Comma PredicateAndArity)*
 }
 PredicateAndArity { Ident { NameUppercase } Slash LiteralInt }
 
-// Parser2 takes the three query clauses in a fixed order, each optional. Accepting them as a
-// repeated choice is a strict superset that keeps the tables small; clause order is a semantic
-// check that `Weeder2` makes anyway.
-// Parser2 takes the clauses in the fixed order select, from, where. Keeping `where` last is both
-// faithful and what lets a single marker settle whether a trailing `where` belongs to the query
-// or to the enclosing declaration.
 ExprFixpointQuery {
-  kwQuery fixpointExpressions (!fixpoint ExprFixpointSelect)? (!fixpoint ExprFixpointFromFragment)?
-  (!fixpoint ExprFixpointWhere)?
+  kwQuery fixpointExpressions ExprFixpointSelect? ExprFixpointFromFragment? ExprFixpointWhere?
 }
-ExprFixpointSelect { kwSelect expression }
-ExprFixpointFromFragment { kwFrom PredicateAtom (!fixpoint Comma PredicateAtom)* }
-ExprFixpointWhere { kwWhere expression }
+ExprFixpointSelect { kwSelect fixpointOperand }
+ExprFixpointFromFragment { kwFrom PredicateAtom (fixpointCommaAhead Comma PredicateAtom)* }
+ExprFixpointWhere { kwWhere fixpointOperand }
 ExprFixpointQueryWithProvenance {
   kwPQuery fixpointExpressions kwSelect PredicateHead kwWith CurlyL commaSep<identUpper> CurlyR
 }
