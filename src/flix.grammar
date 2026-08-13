@@ -348,12 +348,15 @@ UsesOrImportsAlias { identDefinition (ArrowThickR identDefinition)? }
 // Declarations
 // ---------------------------------------------------------------------------
 
-AnnotationList { Annotation+ }
-ModifierList { modifier+ }
+// The reference emits both lists always, empty when the declaration carries neither annotations
+// nor modifiers (visible in every fixtures/expected tree), so these are nullable rather than
+// optional at the use site.
+AnnotationList { Annotation* }
+ModifierList { modifier* }
 modifier { kwPub | kwSealed | kwMut }
 
 // Parser2.scala:962 — annotations strictly precede modifiers, so `pub @Test def` does not parse.
-prologue { AnnotationList? ModifierList? }
+prologue { AnnotationList ModifierList }
 
 declaration {
   DeclModule |
@@ -400,7 +403,7 @@ DeclStruct {
   prologue !decl kwStruct identTypeName TypeParameterList
   (CurlyL commaSep<StructField> CurlyR)?
 }
-StructField { ModifierList? identLower Colon type }
+StructField { ModifierList identLower Colon type }
 
 DeclTrait {
   prologue !decl kwTrait identDefinition TypeParameterList TraitConstraintList? TraitBody?
@@ -683,7 +686,7 @@ RecordOp {
 
 ExprLetMatch { kwLet pattern (Colon type)? Equal !statement statement }
 ExprLocalDef {
-  AnnotationList? kwDef identFunction ParameterList (Colon typeAndEffect)?
+  AnnotationList kwDef identFunction ParameterList (Colon typeAndEffect)?
   Equal !statement statement
 }
 ExprScope { kwRegion identVariable (!lambda ExprBlock)? }
@@ -779,10 +782,12 @@ ExprNew {
 }
 ExprStructPutFieldInit { identLower Equal expression }
 ExprJvmMethod {
-  AnnotationList? kwDef Ident { NameLowercase | NameUppercase | NameMath }
+  AnnotationList kwDef Ident { NameLowercase | NameUppercase | NameMath }
   ParameterList Colon typeAndEffect Equal statement
 }
-ExprJvmConstructor { kwDef kwNew ParenL ParenR Colon typeAndEffect Equal statement }
+// Carries an AnnotationList like ExprJvmMethod does, so both alternatives start alike and the
+// choice is made on `new` rather than needing a token of lookahead past `def`.
+ExprJvmConstructor { AnnotationList kwDef kwNew ParenL ParenR Colon typeAndEffect Equal statement }
 ExprInvokeConstructor { kwNew type ArgumentList }
 
 ExprInvokeSuper { kwSuper (Dot Ident { NameLowercase | NameUppercase })? ArgumentList }

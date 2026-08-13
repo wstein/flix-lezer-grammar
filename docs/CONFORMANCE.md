@@ -17,7 +17,13 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
-111 of the 116 positive fixtures parse with no error node. The five that do not are listed in
+**Oracle lane: 3 of 116 fixtures match the reference tree node for node.** They are pinned by name
+in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
+fixture stops matching. The list only moves up.
+
+The dominant remaining difference is one node, discussed in §3.6.
+
+112 of the 116 positive fixtures parse with no error node. The five that do not are listed in
 `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, each with a reason, and each asserted to _still_
 fail — so a gap that starts parsing fails the suite and has to be taken off the list.
 
@@ -76,6 +82,23 @@ The reference lexer emits a single `Err` token kind for a malformed number, an u
 a free dot and so on, each covering the whole malformed region. This grammar does not model `Err`:
 malformed input goes through Lezer's error recovery instead, which produces a different shape for
 the same input. That difference is confined to the recovery lane, which §1 already does not claim.
+
+### 3.6 `Expr.Expr` — an open question for flix-spec, not a decision here
+
+`fixtures/expected` keeps an `Expr.Expr` node wrapping every expression, and this grammar emits no
+such node. It is the first difference in roughly half of the fixtures that still differ.
+
+`Expr.Expr` is closed by `close(openBefore(lhs), TreeKind.Expr.Expr)` at twelve sites in
+`Parser2.scala` — the same idiom, at the same kind of position, as `Type.Type`, which
+`ast/transparency.json` _does_ elide with the reason that the type productions "re-close a single
+already-closed type node at every level of the precedence climb". The two are structurally
+parallel, and the `elide` rule is arity-sensitive — a node is only removed when it holds one child
+— so adding `Expr.Expr` would be safe by construction.
+
+The choice is therefore between proposing that rule upstream, where the argument can be checked
+against the reference's own structure, and emitting a wrapper node per expression here to match a
+shape that flix-spec may itself decide is an artifact. This repository's position is the former;
+until it is settled, the difference is measured rather than worked around.
 
 ## 4. What is not a divergence
 
