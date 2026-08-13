@@ -87,9 +87,9 @@ and expressing those as Lezer ambiguity markers splits the parse at every identi
 **111 s vs 8 s** for the same grammar subset, and heap exhaustion at full size.
 
 The pattern that works: an external tokenizer performs the same forward scan the reference
-performs and emits a **zero-width token** (`lambdaAhead`, `matchLambdaAhead`, `fixpointCommaAhead`,
-`fixpointQueryAhead`) that only one branch of the grammar can shift. Reach for this before
-reaching for `~marker` or `!precedence`.
+performs and emits a **zero-width token** (`lambdaAhead`, `matchLambdaAhead`, `fixpointCommaAhead`)
+that only one branch of the grammar can shift. Reach for this before reaching for `~marker` or
+`!precedence`.
 
 ### The LR budget
 
@@ -132,8 +132,19 @@ Flix has three recovery kinds and Lezer has one error node.
 ## State of the work
 
 `main` holds the scaffold only. `wip/lexical-layer` holds the lexical layer and the full grammar.
-Its table construction now finishes with the configured 8 GB heap, but generated parser artifacts
-are not committed yet, so `npm run typecheck` still cannot resolve `flix.grammar.terms` there.
+Table construction finishes with the 8 GB heap, and 108 of the 116 positive fixtures parse with no
+error node; the eight that do not are listed in `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, each
+with a reason and each asserted to _still_ fail, so one that starts parsing fails the suite.
+
+`npm run build` and `npm run typecheck` are both still red there, for the same single reason:
+`src/index.ts` and `src/projection.ts` do not exist yet, so Rollup has no entry point and `tsc` has
+nothing that resolves `./flix.grammar.terms`.
+
+**`flix.grammar.terms` is not a missing file and must never be committed.** It is a virtual module
+the `lezer()` Rollup plugin generates from `src/flix.grammar` at build time; `vitest.config.ts`
+loads the same plugin, which is why tests can import the grammar directly while `tsc` — which runs
+no bundler — cannot. If making `typecheck` green becomes worthwhile before the entry points land,
+the fix is to emit a declaration for the virtual module, not to check generated code in.
 
 Still to be written: `src/index.ts`, `src/highlight.ts`, `src/projection.ts`,
 `conformance/projection-map.json`, `scripts/parse-corpus.mjs` (the `npm run corpus` script),

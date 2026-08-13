@@ -16,12 +16,19 @@ the wrong place makes every expression in the file carry a live fork.
 
 So the two parsers cannot be structurally identical, and the differences are not accidents:
 
-| `Parser2` does                           | This grammar does                                    |
-| ---------------------------------------- | ---------------------------------------------------- |
-| unbounded scan for `->` after `(`        | GLR split on `~lambda`, reconverging at the arrow    |
-| two-token peek to tell block from record | GLR split on `~brace`, reconverging after two tokens |
-| precedence climbing in code              | one `@precedence` block, generated into the tables   |
-| one error node kind per recovery site    | Lezer's single error node                            |
+| `Parser2` does                           | This grammar does                                      |
+| ---------------------------------------- | ------------------------------------------------------ |
+| unbounded scan for `->` after `(`        | the same scan, in a tokenizer that emits `lambdaAhead` |
+| lookahead scan to find a match lambda    | the same scan, emitting `matchLambdaAhead`             |
+| two-token peek to tell block from record | GLR split on `~brace`, reconverging after two tokens   |
+| precedence climbing in code              | one `@precedence` block, generated into the tables     |
+| one error node kind per recovery site    | Lezer's single error node                              |
+
+The first two rows started out as `~lambda` ambiguity markers, which is the reading Lezer's own
+documentation suggests. That split the parse at every identifier and cost more states than the
+whole rest of the grammar: 111 s versus 8 s to build the same subset, and heap exhaustion at full
+size. Performing the reference's own lookahead in a tokenizer and handing the parser a zero-width
+token it can shift deterministically is both faster to build and closer to what `Parser2` does.
 
 The grammar also separates `run` and `try` from the general expression operand layer. Their
 repeated `with` and `catch` tails use a narrow set of atomic or delimited operands, since placing
@@ -54,7 +61,7 @@ So every token this grammar can produce is **named**, and named after the upstre
 corresponds to. That buys three things:
 
 1. The projection map is close to an identity function instead of a translation table.
-2. `test/spec/ast/tokenkind.json` becomes a checkable completeness condition — 158 kinds, digest
+2. `.spec/ast/tokenkind.json` becomes a checkable completeness condition — 158 kinds, digest
    pinned, so "which tokens are missing" is a test result rather than an opinion.
 3. Highlighting gets to style tokens directly, rather than inferring role from parent node.
 

@@ -336,17 +336,23 @@ export const coreTokens = new ExternalTokenizer((input) => {
  * whole family lives here to keep the `/` dispatch in one place.
  */
 export const commentTokens = new ExternalTokenizer((input) => {
-  if (input.next !== Ch.Slash) return;
+  // `input.next` is a property, and TypeScript keeps whatever a guard narrowed it to across the
+  // `advance()` calls that change it — after the guard below, every later `input.next` is typed as
+  // `Ch.Slash`, so the comparisons stop meaning anything and one of them is rejected outright.
+  // Reading the current character through `at()` keeps each read typed as what it is.
+  const at = (): number => input.next;
+
+  if (at() !== Ch.Slash) return;
 
   if (input.peek(1) === Ch.Slash) {
     input.advance(2);
     // A doc comment is exactly three slashes: `//` is a line comment, `////` is one again.
     let slashes = 0;
-    while (input.next === Ch.Slash) {
+    while (at() === Ch.Slash) {
       slashes++;
       input.advance();
     }
-    while (input.next >= 0 && input.next !== Ch.Newline) input.advance();
+    while (at() >= 0 && at() !== Ch.Newline) input.advance();
     input.acceptToken(slashes === 1 ? CommentDoc : CommentLine);
     return;
   }
@@ -354,11 +360,11 @@ export const commentTokens = new ExternalTokenizer((input) => {
   if (input.peek(1) !== Ch.Star) return;
   input.advance(2);
   let level = 1;
-  while (input.next >= 0) {
-    if (input.next === Ch.Slash && input.peek(1) === Ch.Star) {
+  while (at() >= 0) {
+    if (at() === Ch.Slash && input.peek(1) === Ch.Star) {
       input.advance(2);
       level++;
-    } else if (input.next === Ch.Star && input.peek(1) === Ch.Slash) {
+    } else if (at() === Ch.Star && input.peek(1) === Ch.Slash) {
       input.advance(2);
       if (--level === 0) {
         input.acceptToken(CommentBlock);
