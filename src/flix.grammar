@@ -1,0 +1,890 @@
+// Lezer grammar for the Flix programming language.
+//
+// Transliterated from the reference compiler's Lexer.scala and Parser2.scala at the release
+// pinned in spec.pin.json. Node names are the upstream `TreeKind` with the dot dropped
+// (`Decl.Def` -> `DeclDef`), so conformance/projection-map.json stays close to an identity
+// function. See docs/ARCHITECTURE.md for why the two parsers are not shaped identically.
+//
+// Targets the current Flix release only. No dialects, no retired syntax.
+
+@precedence {
+  postfix @left,
+  not @right,
+  unarySign @right,
+  lazyForce @right,
+  userOp @left,
+  infixFn @left,
+  discard @right,
+  angledPlus @left,
+  multiplicative @left,
+  additive @left,
+  cons @right,
+  comparison @left,
+  equality @left,
+  and @left,
+  or @left,
+  instanceOf @left,
+  typeApply @left,
+  typeUnary @right,
+  typeAnd @left,
+  typeOr @left,
+  typeXor @left,
+  typeIntersection @left,
+  typeAdditive @left,
+  typeRvAnd @left,
+  typeRvAddSub @left,
+  typeArrow @right,
+  typeEffect @left,
+  fixpoint @left,
+  lambda @right,
+  statement @right,
+  decl @cut
+}
+
+@top SourceFile { UseOrImportList declaration* }
+
+// Comments are part of the tree in Flix — `Parser2.open()` collects them into a CommentList — so
+// the skip tokens are capitalised and appear as siblings. Grouping them is a projection concern.
+@skip { whitespace | CommentLine | CommentDoc | CommentBlock }
+
+// Declared before @tokens so the generated tokenizer array puts them first: the string tokenizer
+// must see a `}` that resumes an interpolated string before the core tokenizer calls it CurlyR.
+// The lookahead tokenizer must be consulted first: its answer decides which of two otherwise
+// indistinguishable readings the parser takes.
+@external tokens matchLambdaAheadToken from "./tokens" { matchLambdaAhead }
+
+@external tokens lambdaAheadToken from "./tokens" { lambdaAhead }
+
+@external tokens stringTokens from "./tokens" {
+  LiteralString,
+  LiteralStringInterpolationL,
+  LiteralStringInterpolationR,
+  DebugInterpolator
+}
+
+@external tokens commentTokens from "./tokens" {
+  CommentLine,
+  CommentDoc,
+  CommentBlock
+}
+
+@external tokens coreTokens from "./tokens" {
+  Ampersand,
+  AngleL,
+  AngleLEqual,
+  AngleR,
+  AngleREqual,
+  AngledEqual,
+  AngledPlus,
+  ArrowThickR,
+  ArrowThinL,
+  ArrowThinRTight,
+  ArrowThinRWhitespace,
+  Backslash,
+  Bang,
+  BangEqual,
+  Bar,
+  BarHash,
+  BracketL,
+  BracketR,
+  Caret,
+  Colon,
+  ColonColon,
+  ColonColonColon,
+  ColonMinus,
+  Comma,
+  CurlyL,
+  CurlyR,
+  Dollar,
+  Dot,
+  DotWhiteSpace,
+  Equal,
+  EqualEqual,
+  GenericOperator,
+  Hash,
+  HashBar,
+  HashCurlyL,
+  HashParenL,
+  HoleAnonymous,
+  Minus,
+  ParenL,
+  ParenR,
+  Plus,
+  Semi,
+  Slash,
+  Star,
+  Tick,
+  Tilde
+}
+
+@tokens {
+  whitespace { @whitespace+ }
+
+  // Lexer.scala:495 — names may contain `!` and `$`, so `x!` is one name and `x!=y` is `x!`, `=`,
+  // `y`. Lexer.scala:365 — a leading `_` joins a name. Lexer.scala:518 — a leading `$` escapes a
+  // name and makes it lowercase whatever its first letter; unlike the reference, the `$` stays
+  // inside the token (docs/LEXER.md).
+  nameChar { @asciiLetter | @digit | "_" | "!" | "$" }
+  NameLowercase { "_"? @asciiLowercase nameChar* | "$" @asciiLetter nameChar* }
+  NameUppercase { "_"? @asciiUppercase nameChar* }
+  // Lexer.scala:508 — the Unicode mathematical operators block.
+  NameMath { "_"? $[\u{2200}-\u{22ff}]+ }
+  Underscore { "_" }
+
+  // Lexer.scala:512, 477 — `?name` is a named hole, `name?` a variable hole.
+  HoleNamed { "?" @asciiLetter nameChar* }
+  HoleVariable { ("_" | "$")? @asciiLetter nameChar* "?" }
+
+  // Lexer.scala:857 — annotation names are letters only.
+  Annotation { "@" @asciiLetter+ }
+  At { "@" }
+
+  // Lexer.scala:439 — %%NAME%%, uppercase, digits and underscores between the delimiters.
+  BuiltIn { "%%" ($[A-Z] | @digit | "_")* "%%" }
+
+  // Lexer.scala:47 — collection literal heads are keywords that end in `#`, so they cannot come
+  // from specialising a name token.
+  ArrayHash { "Array#" }
+  ListHash { "List#" }
+  MapHash { "Map#" }
+  SetHash { "Set#" }
+  VectorHash { "Vector#" }
+  KeywordChooseStar { "choose*" }
+
+  // Lexer.scala:663, 646 — a regex and a char literal may both span newlines; a string may not.
+  LiteralRegex { "regex\"" (escapePair | ![\\"])* "\"" }
+  LiteralChar { "'" (escapePair | ![\\'])* "'" }
+  escapePair { "\\" _ }
+
+  // Lexer.scala:687 — \D([.]\D)?(e([+]|[-])?\D([.]\D)?)?(i8|i16|i32|i64|ii|f32|f64|ff)?
+  // with \D = [0-9]+(_[0-9]+)*, and Lexer.scala:800 for the hexadecimal form.
+  decDigits { @digit+ ("_" @digit+)* }
+  hexDigits { hexDigit+ ("_" hexDigit+)* }
+  hexDigit { @digit | $[a-fA-F] }
+  intNumber { decDigits | "0x" hexDigits }
+  exponent { "e" ("+" | "-")? decDigits ("." decDigits)? }
+  // Lexer.scala:728 — `acceptCommaTail` runs again after the exponent, so `2.1e4.5` is one token.
+  fracNumber { decDigits ("." decDigits exponent? | exponent) }
+  anyNumber { decDigits | fracNumber }
+
+  LiteralInt { intNumber }
+  LiteralInt8 { intNumber "i8" }
+  LiteralInt16 { intNumber "i16" }
+  LiteralInt32 { intNumber "i32" }
+  LiteralInt64 { intNumber "i64" }
+  LiteralBigInt { intNumber "ii" }
+  LiteralFloat { fracNumber }
+  LiteralFloat32 { anyNumber "f32" }
+  LiteralFloat64 { anyNumber "f64" }
+  LiteralBigDecimal { anyNumber "ff" }
+
+  // Every pair below overlaps, and in every pair the longer, more specific token is the one that
+  // should win. Lezer keeps the first-listed of two accepted tokens, so specific comes first.
+  @precedence {
+    LiteralRegex,
+    HoleVariable,
+    ArrayHash,
+    ListHash,
+    MapHash,
+    SetHash,
+    VectorHash,
+    KeywordChooseStar,
+    LiteralInt8,
+    LiteralInt16,
+    LiteralInt32,
+    LiteralInt64,
+    LiteralBigInt,
+    LiteralFloat32,
+    LiteralFloat64,
+    LiteralBigDecimal,
+    LiteralFloat,
+    LiteralInt,
+    Annotation,
+    At,
+    NameLowercase,
+    NameUppercase,
+    NameMath,
+    Underscore
+  }
+}
+
+@detectDelim
+
+// ---------------------------------------------------------------------------
+// Keywords
+//
+// Lexer.scala:399 — a keyword is consumed only when no name character follows, which is exactly
+// what specialising the name token does.
+// ---------------------------------------------------------------------------
+
+kwAlias { @specialize[@name=KeywordAlias]<NameLowercase, "alias"> }
+kwAnd { @specialize[@name=KeywordAnd]<NameLowercase, "and"> }
+kwAs { @specialize[@name=KeywordAs]<NameLowercase, "as"> }
+kwCase { @specialize[@name=KeywordCase]<NameLowercase, "case"> }
+kwCatch { @specialize[@name=KeywordCatch]<NameLowercase, "catch"> }
+kwCheckedCast { @specialize[@name=KeywordCheckedCast]<NameLowercase, "checked_cast"> }
+kwCheckedECast { @specialize[@name=KeywordCheckedECast]<NameLowercase, "checked_ecast"> }
+kwChoose { @specialize[@name=KeywordChoose]<NameLowercase, "choose"> }
+kwDef { @specialize[@name=KeywordDef]<NameLowercase, "def"> }
+kwDiscard { @specialize[@name=KeywordDiscard]<NameLowercase, "discard"> }
+kwEff { @specialize[@name=KeywordEff]<NameLowercase, "eff"> }
+kwElse { @specialize[@name=KeywordElse]<NameLowercase, "else"> }
+kwEMatch { @specialize[@name=KeywordEMatch]<NameLowercase, "ematch"> }
+kwEnum { @specialize[@name=KeywordEnum]<NameLowercase, "enum"> }
+kwFalse { @specialize[@name=KeywordFalse]<NameLowercase, "false"> }
+kwFix { @specialize[@name=KeywordFix]<NameLowercase, "fix"> }
+kwForA { @specialize[@name=KeywordForA]<NameLowercase, "forA"> }
+kwForM { @specialize[@name=KeywordForM]<NameLowercase, "forM"> }
+kwForall { @specialize[@name=KeywordForall]<NameLowercase, "forall"> }
+kwForce { @specialize[@name=KeywordForce]<NameLowercase, "force"> }
+kwForeach { @specialize[@name=KeywordForeach]<NameLowercase, "foreach"> }
+kwFrom { @specialize[@name=KeywordFrom]<NameLowercase, "from"> }
+kwHandler { @specialize[@name=KeywordHandler]<NameLowercase, "handler"> }
+kwIf { @specialize[@name=KeywordIf]<NameLowercase, "if"> }
+kwImport { @specialize[@name=KeywordImport]<NameLowercase, "import"> }
+kwInject { @specialize[@name=KeywordInject]<NameLowercase, "inject"> }
+kwInstance { @specialize[@name=KeywordInstance]<NameLowercase, "instance"> }
+kwInstanceOf { @specialize[@name=KeywordInstanceOf]<NameLowercase, "instanceof"> }
+kwInto { @specialize[@name=KeywordInto]<NameLowercase, "into"> }
+kwLazy { @specialize[@name=KeywordLazy]<NameLowercase, "lazy"> }
+kwLet { @specialize[@name=KeywordLet]<NameLowercase, "let"> }
+kwMatch { @specialize[@name=KeywordMatch]<NameLowercase, "match"> }
+kwMod { @specialize[@name=KeywordMod]<NameLowercase, "mod"> }
+kwMut { @specialize[@name=KeywordMut]<NameLowercase, "mut"> }
+kwNew { @specialize[@name=KeywordNew]<NameLowercase, "new"> }
+kwNot { @specialize[@name=KeywordNot]<NameLowercase, "not"> }
+kwNull { @specialize[@name=KeywordNull]<NameLowercase, "null"> }
+kwOpenVariant { @specialize[@name=KeywordOpenVariant]<NameLowercase, "open_variant"> }
+kwOpenVariantAs { @specialize[@name=KeywordOpenVariantAs]<NameLowercase, "open_variant_as"> }
+kwOr { @specialize[@name=KeywordOr]<NameLowercase, "or"> }
+kwPar { @specialize[@name=KeywordPar]<NameLowercase, "par"> }
+kwPQuery { @specialize[@name=KeywordPQuery]<NameLowercase, "pquery"> }
+kwProject { @specialize[@name=KeywordProject]<NameLowercase, "project"> }
+kwPSolve { @specialize[@name=KeywordPSolve]<NameLowercase, "psolve"> }
+kwPub { @specialize[@name=KeywordPub]<NameLowercase, "pub"> }
+kwQuery { @specialize[@name=KeywordQuery]<NameLowercase, "query"> }
+kwRedef { @specialize[@name=KeywordRedef]<NameLowercase, "redef"> }
+kwRegion { @specialize[@name=KeywordRegion]<NameLowercase, "region"> }
+kwRestrictable { @specialize[@name=KeywordRestrictable]<NameLowercase, "restrictable"> }
+kwRun { @specialize[@name=KeywordRun]<NameLowercase, "run"> }
+kwRvadd { @specialize[@name=KeywordRvadd]<NameLowercase, "rvadd"> }
+kwRvand { @specialize[@name=KeywordRvand]<NameLowercase, "rvand"> }
+kwRvnot { @specialize[@name=KeywordRvnot]<NameLowercase, "rvnot"> }
+kwRvsub { @specialize[@name=KeywordRvsub]<NameLowercase, "rvsub"> }
+kwSealed { @specialize[@name=KeywordSealed]<NameLowercase, "sealed"> }
+kwSelect { @specialize[@name=KeywordSelect]<NameLowercase, "select"> }
+kwSolve { @specialize[@name=KeywordSolve]<NameLowercase, "solve"> }
+kwSpawn { @specialize[@name=KeywordSpawn]<NameLowercase, "spawn"> }
+kwStaticLowercase { @specialize[@name=KeywordStaticLowercase]<NameLowercase, "static"> }
+kwStruct { @specialize[@name=KeywordStruct]<NameLowercase, "struct"> }
+kwSuper { @specialize[@name=KeywordSuper]<NameLowercase, "super"> }
+kwThrow { @specialize[@name=KeywordThrow]<NameLowercase, "throw"> }
+kwTrait { @specialize[@name=KeywordTrait]<NameLowercase, "trait"> }
+kwTrue { @specialize[@name=KeywordTrue]<NameLowercase, "true"> }
+kwTry { @specialize[@name=KeywordTry]<NameLowercase, "try"> }
+kwType { @specialize[@name=KeywordType]<NameLowercase, "type"> }
+kwUncheckedCast { @specialize[@name=KeywordUncheckedCast]<NameLowercase, "unchecked_cast"> }
+kwUnsafe { @specialize[@name=KeywordUnsafe]<NameLowercase, "unsafe"> }
+kwUse { @specialize[@name=KeywordUse]<NameLowercase, "use"> }
+kwWhere { @specialize[@name=KeywordWhere]<NameLowercase, "where"> }
+kwWith { @specialize[@name=KeywordWith]<NameLowercase, "with"> }
+kwXor { @specialize[@name=KeywordXor]<NameLowercase, "xor"> }
+kwXvar { @specialize[@name=KeywordXvar]<NameLowercase, "xvar"> }
+kwYield { @specialize[@name=KeywordYield]<NameLowercase, "yield"> }
+
+kwStaticUppercase { @specialize[@name=KeywordStaticUppercase]<NameUppercase, "Static"> }
+kwUniv { @specialize[@name=KeywordUniv]<NameUppercase, "Univ"> }
+
+// ---------------------------------------------------------------------------
+// Names
+// ---------------------------------------------------------------------------
+
+Ident { NameLowercase | NameUppercase | NameMath | Underscore | GenericOperator }
+
+// Parser2.scala:738 — a qualified name is a run of uppercase segments that may end in one
+// lowercase segment. `sb.append` is the name `sb` followed by a field access, not one name.
+// `use A.B` and `use A.{b, c}` differ only two tokens after the name, which LR(1)
+// cannot see. The markers let the parser split and reconverge at the `{`.
+QName { (identUpper ~qname Dot)* (identUpper | identLower) ~qname }
+// Parser2.scala:689 — NAME_QNAME is NameLowercase and NameUppercase only; a math name is
+// never a qualified-name segment, which is what keeps `let ⊆ = ...` a variable pattern.
+identUpper { Ident { NameUppercase } }
+identLower { Ident { NameLowercase } }
+
+// Parser2.scala:738 — Java names are parsed with an empty tail set, so they never stop early.
+JavaQName { identJava (~javaQname Dot identJava)* ~javaQname }
+
+// A qualified name whose every segment is uppercase: tags, effects, traits in type
+// position and the like.
+QNameUpper[@name=QName] { identUpper (Dot identUpper)* }
+identJava { Ident { NameLowercase | NameUppercase } }
+
+// NAME_PARAMETER / NAME_VARIABLE — binding positions, which unlike qualified-name segments admit
+// a wildcard.
+identVariable { Ident { NameLowercase | NameMath | Underscore } }
+// NAME_FUNCTION — Flix lets a definition be named by a user-defined operator, which is how the
+// standard library declares `>>` and friends.
+identFunction { Ident { NameLowercase | NameMath | GenericOperator } }
+// NAME_DEFINITION / NAME_USE — also uppercase, for trait names and `use Bool.{==>}`.
+identDefinition { Ident { NameLowercase | NameUppercase | NameMath | GenericOperator } }
+identTypeName { Ident { NameUppercase } | kwStaticUppercase }
+
+// ---------------------------------------------------------------------------
+// Uses and imports
+// ---------------------------------------------------------------------------
+
+UseOrImportList { useOrImport* }
+useOrImport { (UsesOrImportsUse | UsesOrImportsImport) Semi? }
+
+UsesOrImportsUse { kwUse QName (Dot UseOrImportMany)? }
+UsesOrImportsImport { kwImport JavaQName (Dot UseOrImportMany)? }
+UseOrImportMany { CurlyL commaSep<UsesOrImportsAlias> CurlyR }
+UsesOrImportsAlias { identDefinition (ArrowThickR identDefinition)? }
+
+// ---------------------------------------------------------------------------
+// Declarations
+// ---------------------------------------------------------------------------
+
+AnnotationList { Annotation+ }
+ModifierList { modifier+ }
+modifier { kwPub | kwSealed | kwMut }
+
+// Parser2.scala:962 — annotations strictly precede modifiers, so `pub @Test def` does not parse.
+prologue { AnnotationList? ModifierList? }
+
+declaration {
+  DeclModule |
+  DeclDef |
+  DeclEnum |
+  DeclStruct |
+  DeclTrait |
+  DeclInstance |
+  DeclEffect |
+  DeclTypeAlias
+}
+
+DeclModule {
+  prologue !decl kwMod QName CurlyL UseOrImportList declaration* CurlyR
+}
+
+DeclDef {
+  prologue !decl (kwDef | kwRedef) identFunction TypeParameterList? ParameterList
+  Colon typeAndEffect TraitConstraintList? DeclEqualityConstraintList?
+  Equal statement
+}
+
+// A trait signature is a `def` whose body may be omitted.
+DeclSignature {
+  prologue kwDef identFunction TypeParameterList? ParameterList
+  Colon typeAndEffect TraitConstraintList? DeclEqualityConstraintList?
+  (Equal statement)?
+}
+
+// Parser2.scala:1147 — a restrictable enum takes a mandatory bare `[s]` before its ordinary type
+// parameters, so the two bracket lists have to be told apart by the keyword rather than by shape.
+DeclEnum {
+  prologue !decl
+  (kwEnum identTypeName | kwRestrictable kwEnum identTypeName TypeParameterList)
+  TypeParameterList? CaseBody? TypeDerivationList? EnumBody?
+}
+EnumBody { CurlyL Case* CurlyR }
+// Parser2.scala:1195 — separators are optional and `case` may be elided.
+Case { Comma? kwCase? Ident { NameUppercase } CaseBody? }
+CaseBody { ParenL commaSep<type> ParenR }
+TypeDerivationList { kwWith commaSep1<QName> }
+
+DeclStruct {
+  prologue !decl kwStruct identTypeName TypeParameterList
+  (CurlyL commaSep<StructField> CurlyR)?
+}
+StructField { ModifierList? identLower Colon type }
+
+DeclTrait {
+  prologue !decl kwTrait identDefinition TypeParameterList TraitConstraintList? TraitBody?
+}
+TraitBody { CurlyL (DeclSignature | DeclAssociatedTypeSig)* CurlyR }
+DeclAssociatedTypeSig {
+  prologue kwType identTypeName TypeParameterList? (Colon Kind)? (Equal type)?
+}
+
+DeclInstance {
+  prologue !decl kwInstance QName BracketL type BracketR
+  TraitConstraintList? DeclEqualityConstraintList? InstanceBody?
+}
+InstanceBody { CurlyL (DeclDef | DeclAssociatedTypeDef)* CurlyR }
+DeclAssociatedTypeDef { prologue kwType identTypeName TypeArgumentList? (Equal type)? }
+
+DeclEffect { prologue !decl kwEff Ident { NameUppercase } EffectBody? }
+EffectBody { CurlyL DeclOp* CurlyR }
+// Parser2.scala:1339 — an operation takes no effect annotation and no body.
+DeclOp { prologue kwDef identFunction ParameterList? Colon type TraitConstraintList? }
+
+DeclTypeAlias {
+  prologue !decl kwType kwAlias identTypeName TypeParameterList? Equal type
+}
+
+// ---------------------------------------------------------------------------
+// Parameters, constraints, kinds
+// ---------------------------------------------------------------------------
+
+ParameterList { ParenL commaSep<Parameter> ParenR }
+Parameter { identVariable (Colon type)? }
+
+TypeParameterList { BracketL commaSep<TypeParameter> BracketR }
+TypeParameter { identVariable (Colon Kind)? }
+
+TypeArgumentList { BracketL commaSep<typeArgument> BracketR }
+typeArgument { TypeArgument { type } }
+
+TraitConstraintList { kwWith commaSep1<TraitConstraint> }
+TraitConstraint { QName BracketL type BracketR }
+
+// commaSep1, not commaSep: an empty `where` is meaningless, and admitting it makes
+// `where { ... }` ambiguous between no constraints and one record-type constraint.
+DeclEqualityConstraintList { kwWhere commaSep1<DeclEqualityConstraintFragment> }
+DeclEqualityConstraintFragment { type Tilde type }
+
+// Parser2.scala:3689 — the reference only accepts a parenthesis before the name; this is the
+// natural superset, and a kind that parses here but not there is rejected by the compiler anyway.
+Kind { Ident { NameUppercase } | ParenL Kind ParenR | KindArrow }
+KindArrow { Kind !typeArrow ArrowThinRWhitespace Kind }
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// Parser2.scala:3630 — `a -> b \ ef` attaches the effect to the arrow's result.
+typeAndEffect { type (!typeEffect TypeEffect)? }
+TypeEffect { Backslash type }
+
+type {
+  TypeVariable |
+  TypeConstant |
+  TypeName |
+  TypeTuple |
+  TypeRecordRow |
+  TypeRecord |
+  TypeEffectSet |
+  TypeSchema |
+  TypeSchemaRow |
+  TypeExtensible |
+  TypeCaseSet |
+  TypeApply |
+  TypeUnary |
+  TypeBinary
+}
+
+TypeName { identTypeName (Dot identTypeName)* }
+TypeVariable { Ident { NameLowercase | NameMath | Underscore } }
+TypeConstant { kwUniv | kwTrue | kwFalse }
+
+TypeApply { type !typeApply TypeArgumentList }
+
+TypeUnary { (kwNot | Tilde | kwRvnot) !typeUnary type }
+
+TypeBinary {
+  type !typeArrow ArrowThinRWhitespace typeAndEffect |
+  type !typeRvAddSub (kwRvadd | kwRvsub) type |
+  type !typeRvAnd kwRvand type |
+  type !typeAdditive (Plus | Minus) type |
+  type !typeIntersection Ampersand type |
+  type !typeXor kwXor type |
+  type !typeOr kwOr type |
+  type !typeAnd kwAnd type
+}
+
+// Parser2.scala:3510 — `()` is the empty record row, never a tuple.
+TypeTuple { ParenL commaSep1<type> ParenR }
+TypeRecordRow { ParenL commaSep<TypeRecordField> (Bar type)? ParenR }
+// `{}` is the empty effect set; a record needs a field or the `| row` tail.
+TypeRecord {
+  CurlyL (commaSep1<TypeRecordField> (Bar type)? | Bar type?) CurlyR
+}
+TypeRecordField { identLower Equal type }
+TypeEffectSet { CurlyL commaSep<type> CurlyR }
+
+TypeSchema { HashCurlyL commaSep<TypeSchemaTerm> (Bar type)? CurlyR }
+TypeSchemaRow { HashParenL commaSep<TypeSchemaTerm> (Bar type)? ParenR }
+TypeExtensible { HashBar commaSep<TypeSchemaTerm> (Bar type)? BarHash }
+TypeSchemaTerm {
+  QName (TypeArgumentList | ParenL commaSep<type> (Semi type)? ParenR)?
+}
+TypeCaseSet { AngleL commaSep<QName> AngleR }
+
+// ---------------------------------------------------------------------------
+// Patterns
+// ---------------------------------------------------------------------------
+
+pattern {
+  PatternVariable |
+  PatternLiteral |
+  PatternTag |
+  PatternTuple |
+  PatternRecord |
+  PatternUnary |
+  PatternFCons
+}
+
+PatternVariable { identVariable }
+PatternLiteral { literal }
+// Parser2.scala:700 — NAME_TAG is uppercase only, which is what tells `let x = ...` (a variable)
+// from `let Foo(x) = ...` (a tag).
+PatternTag { QNameUpper PatternTagBody? }
+PatternTagBody { ParenL commaSep<pattern> ParenR }
+PatternTuple { ParenL commaSep<pattern> ParenR }
+PatternRecord { CurlyL ~brace commaSep<PatternRecordLabelPattern> (Bar pattern)? CurlyR }
+PatternRecordLabelPattern { identLower (Equal pattern)? }
+PatternUnary { Minus literal }
+PatternFCons { pattern !cons ColonColon pattern }
+
+// ---------------------------------------------------------------------------
+// Literals
+// ---------------------------------------------------------------------------
+
+literal {
+  ExprLiteral {
+    LiteralInt | LiteralInt8 | LiteralInt16 | LiteralInt32 | LiteralInt64 | LiteralBigInt |
+    LiteralFloat | LiteralFloat32 | LiteralFloat64 | LiteralBigDecimal |
+    LiteralChar | LiteralRegex | LiteralString | kwTrue | kwFalse | kwNull
+  } |
+  ExprStringInterpolation
+}
+
+ExprStringInterpolation {
+  (LiteralStringInterpolationL statement)+ LiteralStringInterpolationR
+}
+
+// ---------------------------------------------------------------------------
+// Expressions
+// ---------------------------------------------------------------------------
+
+statement { expression | ExprStatement }
+ExprStatement { expression !statement Semi statement }
+
+expression {
+  literal |
+  ExprDebug |
+  ExprQName |
+  ExprIntrinsic |
+  ExprHole |
+  ExprHoleNamed |
+  ExprHoleVariable |
+  ExprStatic |
+  ExprParen |
+  ExprTuple |
+  ExprAscribe |
+  ExprOperatorAsLambda |
+  ExprLambda |
+  ExprBlock |
+  ExprRecordOperation |
+  ExprLetMatch |
+  ExprLocalDef |
+  ExprScope |
+  ExprIfThenElse |
+  ExprMatch |
+  ExprLambdaMatch |
+  ExprExtMatch |
+  ExprLambdaExtMatch |
+  ExprRestrictableChoose |
+  ExprExtTag |
+  ExprOpenVariant |
+  ExprForeach |
+  ExprForMonadic |
+  ExprForApplicative |
+  ExprLiteralArray |
+  ExprLiteralVector |
+  ExprLiteralList |
+  ExprLiteralSet |
+  ExprLiteralMap |
+  ExprCheckedTypeCast |
+  ExprUncheckedCast |
+  ExprUnsafe |
+  ExprRun |
+  ExprHandler |
+  ExprTry |
+  ExprThrow |
+  ExprNew |
+  ExprInvokeConstructor |
+  ExprInvokeSuper |
+  ExprSpawn |
+  ExprParYield |
+  ExprSelect |
+  ExprUse |
+  ExprFixpointConstraintSet |
+  ExprFixpointSolveWithProject |
+  ExprFixpointSolveWithProvenance |
+  ExprFixpointInject |
+  ExprFixpointQuery |
+  ExprFixpointQueryWithProvenance |
+  ExprFixpointLambda |
+  ExprApply |
+  ExprInvokeMethod |
+  ExprGetField |
+  ExprRecordSelect |
+  ExprStructGet |
+  ExprStructPut |
+  ExprIndex |
+  ExprIndexMut |
+  ExprUnary |
+  ExprBinary
+}
+
+ExprQName { QName }
+ExprIntrinsic { BuiltIn }
+ExprHole { HoleAnonymous }
+ExprHoleNamed { HoleNamed }
+ExprHoleVariable { HoleVariable }
+ExprStatic { kwStaticUppercase }
+ExprDebug { DebugInterpolator literal }
+
+// Parser2.scala:2086 — `(` opens a parenthesised expression, a tuple or an ascription, and the
+// reference tells them apart by the token *after* the first expression: `)` closes a paren, `:`
+// an ascription, `=` or `,` a tuple. That is one token of lookahead, so the shapes below only
+// have to make sure a one-element tuple is never a possibility: a tuple needs either a named
+// element or a second one.
+ExprParen { ParenL expression ParenR }
+ExprTuple {
+  ParenL ParenR |
+  ParenL ArgumentNamed (Comma argument)* ParenR |
+  ParenL Argument (Comma argument)+ ParenR
+}
+ExprAscribe { ParenL expression Colon typeAndEffect ParenR }
+ExprOperatorAsLambda { ParenL Operator { operatorToken } ParenR }
+operatorToken {
+  Plus | Minus | Star | Slash | AngleL | AngleR | AngledEqual | AngleLEqual | AngleREqual |
+  EqualEqual | BangEqual | ColonColonColon | GenericOperator
+}
+
+// `lambdaAhead` is a zero-width token the lookahead tokenizer emits only when a spaced `->`
+// follows this head, so the parser takes this branch deterministically instead of carrying a
+// tuple reading alongside it. See src/tokens.ts.
+ExprLambda { lambdaAhead lambdaParams ArrowThinRWhitespace expression }
+lambdaParams { ParameterList | Parameter }
+
+ExprBlock { CurlyL ~brace statement CurlyR }
+
+ExprRecordOperation {
+  CurlyL ~brace commaSep<RecordOp> (Bar expression)? CurlyR
+}
+// Parser2.scala:1615 — `{` opens a block, a record literal or a record operation, and the
+// reference needs two non-comment tokens to tell them apart. The markers let the parser carry both
+// readings for exactly those two tokens.
+RecordOp {
+  Plus ~brace identLower Equal expression |
+  Minus ~brace identLower |
+  identLower ~brace Equal expression
+}
+
+ExprLetMatch { kwLet pattern (Colon type)? Equal !statement statement }
+ExprLocalDef {
+  AnnotationList? kwDef identFunction ParameterList (Colon typeAndEffect)?
+  Equal !statement statement
+}
+ExprScope { kwRegion identVariable (!lambda ExprBlock)? }
+
+ExprIfThenElse {
+  kwIf ParenL expression ParenR expression (!lambda kwElse expression)?
+}
+
+ExprMatch { kwMatch expression MatchRuleList }
+MatchRuleList { CurlyL (MatchRule Comma?)* CurlyR }
+MatchRule { kwCase pattern (kwIf expression)? ArrowThickR statement }
+ExprLambdaMatch { kwMatch matchLambdaAhead pattern ArrowThinRWhitespace expression }
+
+ExprExtMatch { kwEMatch expression ExtMatchRuleList }
+ExtMatchRuleList { CurlyL (ExtMatchRule Comma?)* CurlyR }
+ExtMatchRule { kwCase pattern ArrowThickR statement }
+ExprLambdaExtMatch { kwEMatch matchLambdaAhead pattern ArrowThinRWhitespace expression }
+
+ExprRestrictableChoose { (kwChoose | KeywordChooseStar) expression MatchRuleList }
+
+ExprExtTag { kwXvar Ident { NameUppercase } (!lambda ArgumentList)? }
+ExprOpenVariant {
+  kwOpenVariant QName |
+  kwOpenVariantAs QName expression
+}
+
+ForFragmentList {
+  ParenL forFragment (Semi forFragment)* ParenR
+}
+forFragment { ForFragmentGuard | ForFragmentGenerator | ForFragmentLet }
+ForFragmentGuard { kwIf expression }
+ForFragmentGenerator { pattern ArrowThinL expression }
+ForFragmentLet { pattern Equal expression }
+
+ExprForeach { kwForeach ForFragmentList !lambda expression }
+ExprForMonadic { kwForM ForFragmentList kwYield expression }
+ExprForApplicative { kwForA ForFragmentList kwYield expression }
+
+// Parser2.scala:2537 — an array literal requires an explicit region.
+ExprLiteralArray { ArrayHash CurlyL commaSep<expression> CurlyR ScopeName }
+ExprLiteralVector { VectorHash CurlyL commaSep<expression> CurlyR }
+ExprLiteralList { ListHash CurlyL commaSep<expression> CurlyR }
+ExprLiteralSet { SetHash CurlyL commaSep<expression> CurlyR }
+ExprLiteralMap { MapHash CurlyL commaSep<ExprLiteralMapKeyValue> CurlyR }
+ExprLiteralMapKeyValue { expression ArrowThickR expression }
+ScopeName { At expression }
+
+ExprCheckedTypeCast { (kwCheckedCast | kwCheckedECast) ParenL expression ParenR }
+ExprUncheckedCast {
+  kwUncheckedCast ParenL expression (kwAs typeAndEffect)? ParenR
+}
+ExprUnsafe { kwUnsafe type (kwAs type)? ExprBlock }
+
+ExprRun { kwRun expression (!lambda kwWith expression)+ }
+ExprHandler { kwHandler QName HandlerRuleList }
+HandlerRuleList { CurlyL (HandlerRule Comma?)* CurlyR }
+HandlerRule { kwDef identLower ParameterList Equal expression }
+
+ExprTry { kwTry expression (!lambda ExprTryCatchBodyFragment)* }
+ExprTryCatchBodyFragment { kwCatch CurlyL (ExprTryCatchRuleFragment Comma?)* CurlyR }
+ExprTryCatchRuleFragment { kwCase identVariable Colon JavaQName ArrowThickR statement }
+ExprThrow { kwThrow !lambda expression }
+
+ExprNew {
+  kwNew type ScopeName CurlyL commaSep<ExprStructPutFieldInit> CurlyR |
+  kwNew type CurlyL (ExprJvmMethod | ExprJvmConstructor)* CurlyR
+}
+ExprStructPutFieldInit { identLower Equal expression }
+ExprJvmMethod {
+  AnnotationList? kwDef Ident { NameLowercase | NameUppercase | NameMath }
+  ParameterList Colon typeAndEffect Equal statement
+}
+ExprJvmConstructor { kwDef kwNew ParenL ParenR Colon typeAndEffect Equal statement }
+ExprInvokeConstructor { kwNew type ArgumentList }
+
+ExprInvokeSuper { kwSuper (Dot Ident { NameLowercase | NameUppercase })? ArgumentList }
+
+ExprSpawn { kwSpawn expression ScopeName }
+ExprParYield { kwPar ParYieldFragmentList? kwYield expression }
+ParYieldFragmentList { ParenL ParYieldFragment (Semi ParYieldFragment)* ParenR }
+ParYieldFragment { pattern ArrowThinL expression }
+
+ExprSelect { kwSelect CurlyL ExprSelectRuleFragment* CurlyR }
+ExprSelectRuleFragment {
+  kwCase identVariable ArrowThinL QName ParenL expression ParenR ArrowThickR statement |
+  kwCase Ident { Underscore } ArrowThickR statement
+}
+
+ExprUse { (UsesOrImportsUse | UsesOrImportsImport) Semi !statement statement }
+
+// ---------------------------------------------------------------------------
+// Datalog
+// ---------------------------------------------------------------------------
+
+ExprFixpointConstraintSet { HashCurlyL ExprFixpointConstraint* CurlyR }
+// Parser2.scala — a constraint is terminated by a dot with trailing whitespace, which is why the
+// lexer gives that dot its own token kind.
+ExprFixpointConstraint {
+  PredicateHead (ColonMinus commaSep1<predicateBody>)? DotWhiteSpace
+}
+PredicateHead { Ident { NameUppercase } (!lambda PredicateTermList)? }
+PredicateTermList { ParenL commaSep<expression> (Semi expression)? ParenR }
+predicateBody { PredicateGuard | PredicateFunctional | PredicateAtom }
+PredicateGuard { kwIf ParenL expression ParenR }
+PredicateFunctional {
+  kwLet (identVariable | ParenL commaSep<identVariable> ParenR) Equal expression
+}
+PredicateAtom {
+  kwNot? kwFix? Ident { NameUppercase } (!lambda PredicatePatternList)?
+}
+PredicatePatternList { ParenL commaSep<pattern> (Semi pattern)? ParenR }
+
+// The list is greedy: a `,` after it continues the list rather than closing an enclosing
+// argument list, which is what the reference does by parsing it with `zeroOrMore`.
+// The operand list of a fixpoint expression is a comma-separated list sitting where an enclosing
+// argument list may also use commas. Admitting a full expression on each side of that comma makes
+// the LR automaton carry the choice through every expression state, and the tables stop building
+// altogether. The operands real code uses are names, applications, parenthesised expressions and
+// constraint sets, so that is the class accepted here: anything else has to be parenthesised.
+// Recorded in docs/CONFORMANCE.md.
+fixpointOperand {
+  ExprQName |
+  ExprParen |
+  ExprBlock |
+  ExprFixpointConstraintSet |
+  ExprApply { fixpointOperand !postfix ArgumentList }
+}
+fixpointExpressions { fixpointOperand | fixpointExpressions !fixpoint Comma fixpointOperand }
+fixpointNames { identUpper | fixpointNames !fixpoint Comma identUpper }
+
+ExprFixpointSolveWithProject {
+  kwSolve fixpointExpressions (!lambda kwProject fixpointNames)?
+}
+ExprFixpointSolveWithProvenance { kwPSolve fixpointExpressions }
+ExprFixpointInject {
+  kwInject fixpointExpressions kwInto PredicateAndArity (!fixpoint Comma PredicateAndArity)*
+}
+PredicateAndArity { Ident { NameUppercase } Slash LiteralInt }
+
+// Parser2 takes the three query clauses in a fixed order, each optional. Accepting them as a
+// repeated choice is a strict superset that keeps the tables small; clause order is a semantic
+// check that `Weeder2` makes anyway.
+// Parser2 takes the clauses in the fixed order select, from, where. Keeping `where` last is both
+// faithful and what lets a single marker settle whether a trailing `where` belongs to the query
+// or to the enclosing declaration.
+ExprFixpointQuery {
+  kwQuery fixpointExpressions (!fixpoint ExprFixpointSelect)? (!fixpoint ExprFixpointFromFragment)?
+  (!fixpoint ExprFixpointWhere)?
+}
+ExprFixpointSelect { kwSelect expression }
+ExprFixpointFromFragment { kwFrom PredicateAtom (!fixpoint Comma PredicateAtom)* }
+ExprFixpointWhere { kwWhere expression }
+ExprFixpointQueryWithProvenance {
+  kwPQuery fixpointExpressions kwSelect PredicateHead kwWith CurlyL commaSep<identUpper> CurlyR
+}
+
+ExprFixpointLambda {
+  HashParenL commaSep<PredicateParam> ParenR ArrowThinRWhitespace expression
+}
+PredicateParam {
+  Ident { NameUppercase } (ParenL commaSep<type> (Semi type)? ParenR)?
+}
+
+// ---------------------------------------------------------------------------
+// Application, access and operators
+// ---------------------------------------------------------------------------
+
+ArgumentList { ParenL commaSep<argument> ParenR }
+argument { Argument | ArgumentNamed }
+Argument { expression }
+ArgumentNamed { expression Equal expression }
+
+ExprApply { expression !postfix ArgumentList }
+ExprInvokeMethod { expression !postfix Dot identLower ArgumentList }
+ExprGetField { expression !postfix Dot identLower }
+// Record selection is `r#label`; `.label` is Java field access.
+ExprRecordSelect { expression !postfix Hash identLower }
+ExprStructGet { expression !postfix ArrowThinRTight identLower }
+ExprStructPut { expression !postfix ArrowThinRTight identLower Equal expression }
+ExprIndex { expression !postfix BracketL expression BracketR }
+ExprIndexMut { expression !postfix BracketL expression BracketR Equal expression }
+
+ExprUnary {
+  Operator { kwDiscard } !discard expression |
+  Operator { kwLazy | kwForce } !lazyForce expression |
+  Operator { Plus | Minus } ~brace !unarySign expression |
+  Operator { kwNot } !not expression
+}
+
+ExprBinary {
+  expression !cons Operator { ColonColon | ColonColonColon } expression |
+  expression !infixFn Operator { Tick QName Tick } expression |
+  expression !instanceOf Operator { kwInstanceOf } expression |
+  expression !or Operator { kwOr } expression |
+  expression !and Operator { kwAnd } expression |
+  expression !equality Operator { EqualEqual | AngledEqual | BangEqual } expression |
+  expression !comparison Operator { AngleL | AngleR | AngleLEqual | AngleREqual } expression |
+  expression !additive Operator { Plus | Minus } expression |
+  expression !multiplicative Operator { Star | Slash } expression |
+  expression !angledPlus Operator { AngledPlus } expression |
+  expression !userOp Operator { GenericOperator | NameMath } expression
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Parser2 builds every delimited list with Separation.Required(Comma, allowTrailing = false).
+commaSep<content> { (content (Comma content)*)? }
+commaSep1<content> { content (Comma content)* }
