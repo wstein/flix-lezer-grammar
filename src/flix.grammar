@@ -852,9 +852,14 @@ PredicateAndArity { Ident { NameUppercase } Slash LiteralInt }
 ExprFixpointQuery {
   kwQuery fixpointExpressions ExprFixpointSelect? ExprFixpointFromFragment? ExprFixpointWhere?
 }
-ExprFixpointSelect { kwSelect fixpointOperand }
+// The select operand stays bounded: admitting `expression` here lets it be another query, and a
+// following `where` then belongs to either the inner or the outer one. `where` itself has no such
+// problem — nothing can follow it that a nested query could also claim — so it takes the full
+// expression grammar, which is what `where x < y` needs.
+ExprFixpointSelect { kwSelect queryOperand }
+queryOperand { fixpointOperand | ExprTuple | literal }
 ExprFixpointFromFragment { kwFrom PredicateAtom (fixpointCommaAhead Comma PredicateAtom)* }
-ExprFixpointWhere { kwWhere fixpointOperand }
+ExprFixpointWhere { kwWhere expression }
 ExprFixpointQueryWithProvenance {
   kwPQuery fixpointExpressions kwSelect PredicateHead kwWith CurlyL commaSep<identUpper> CurlyR
 }

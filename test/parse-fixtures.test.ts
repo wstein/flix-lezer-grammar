@@ -24,11 +24,6 @@ function errorCount(source: string): number {
  */
 const KNOWN_GAPS = new Map<string, string>([
   [
-    "datalog__query-with-a-where-clause.flix",
-    "query clauses were restructured into fixed-order optionals to bound the tables, and a " +
-      "trailing `where` still binds to the enclosing declaration rather than the query",
-  ],
-  [
     "expressions__match-lambda.flix",
     "matchLambdaAhead does not fire for every pattern head Parser2's detectMatchLambda accepts",
   ],
@@ -66,6 +61,20 @@ describe("fixpoint comma lookahead", () => {
   it("leaves an argument-list comma alone", () => {
     // The `,` here closes `g`'s first argument; taking it as a list continuation would swallow it.
     expect(errorCount("def f(): Unit = g(solve db, 1)")).toBe(0);
+  });
+});
+
+describe("query clauses", () => {
+  // `select` takes a bounded operand and `where` the full expression grammar. The asymmetry is not
+  // arbitrary: a nested query in `select` position would leave a following `where` claimable by
+  // either query, while nothing that can follow `where` is claimable by a nested one.
+  it.each([
+    "query db select (x, y) from Edge(x, y) where x < y",
+    "query db select x from R(x)",
+    "query db, pr select x from Reachable(x)",
+    "query db where a and b",
+  ])("accepts %s", (source) => {
+    expect(errorCount(`def f(): Unit = ${source}`), source).toBe(0);
   });
 });
 
