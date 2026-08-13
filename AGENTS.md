@@ -72,10 +72,11 @@ to a projected tree that `flix-spec` compares against the reference compiler's o
 
 ### Why some tokens are external
 
-Four constructs cannot be expressed as a DFA, and `src/tokens.ts` transliterates them from
-`Lexer.scala`: the whitespace-sensitive `->` (`a->b` is struct access, `a -> b` the function
-arrow), the `.` trichotomy (name separator / Datalog terminator / error), nested block comments,
-and interpolated-string segmentation. The punctuation and fixed-operator tries reproduce
+`src/tokens.ts` holds six tokenizers: three that lex and three that answer a lookahead question.
+The lexing three exist because four constructs cannot be expressed as a DFA — the
+whitespace-sensitive `->` (`a->b` is struct access, `a -> b` the function arrow), the `.`
+trichotomy (name separator / Datalog terminator / error), nested block comments, and
+interpolated-string segmentation. `docs/LEXER.md` has the full contract. The punctuation and fixed-operator tries reproduce
 `Lexer.advanceIfInTree` exactly, including its refusal to fall back to a shorter match: `<+x`
 stops at the valueless node `<+` and yields nothing rather than the `<` one character back.
 
@@ -132,7 +133,7 @@ Flix has three recovery kinds and Lezer has one error node.
 ## State of the work
 
 `main` holds the scaffold only. `wip/lexical-layer` holds the lexical layer and the full grammar.
-Table construction finishes with the 8 GB heap, and 108 of the 116 positive fixtures parse with no
+Table construction finishes with the 8 GB heap, and 111 of the 116 positive fixtures parse with no
 error node; the eight that do not are listed in `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, each
 with a reason and each asserted to _still_ fail, so one that starts parsing fails the suite.
 
@@ -147,10 +148,9 @@ no bundler — cannot. If making `typecheck` green becomes worthwhile before the
 the fix is to emit a declaration for the virtual module, not to check generated code in.
 
 Still to be written: `src/index.ts`, `src/highlight.ts`, `src/projection.ts`,
-`conformance/projection-map.json`, `scripts/parse-corpus.mjs` (the `npm run corpus` script),
-`docs/LEXER.md` and `docs/CONFORMANCE.md`. `docs/CONFORMANCE.md` in particular has to record the
-divergences the grammar has already accumulated — the `$name` token extent, the narrowed fixpoint
-operand class, `where`-clause position, and the absence of lexer error tokens.
+`conformance/projection-map.json`, and `scripts/parse-corpus.mjs` (the `npm run corpus` script).
+The divergences the grammar has accumulated are recorded in `docs/CONFORMANCE.md`; add to it
+rather than to a commit message when a new one becomes necessary.
 
 ## Conventions
 

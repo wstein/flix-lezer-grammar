@@ -42,7 +42,7 @@ operands without expanding the outer repetition's state space.
 source text
   │
   ├─ @tokens              regular tokens: 150-odd of the 158 TokenKinds
-  ├─ @external tokens     the four constructs a DFA cannot express (docs/LEXER.md)
+  ├─ @external tokens     three lexical, three lookahead (docs/LEXER.md)
   ├─ @external specialize keywords, off the shared name token
   │
   ▼

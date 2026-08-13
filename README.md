@@ -15,7 +15,7 @@ oracle that `tree-sitter-flix`, `flix-antlr-grammar` and `flix-textmate` are als
 ## Scope: one language version, no dialects
 
 This grammar targets **the current Flix release only** — `v0.75.2`, as pinned in
-[`test/spec/PIN.json`](test/spec/PIN.json). There is no `@dialects` block and no compatibility
+[`spec.pin.json`](spec.pin.json). There is no `@dialects` block and no compatibility
 path for retired syntax: `law` and `lawful` are ordinary lowercase names here, because that is what
 they are in the language today.
 
@@ -25,15 +25,19 @@ current release is the cheaper and more honest contract.
 
 ## Status
 
-| Phase | Delivers                                                  | State |
-| ----- | --------------------------------------------------------- | ----- |
-| 1     | Toolchain, docs, digest-pinned `flix-spec` vendoring      | ✅    |
-| 2     | Lexical layer: `@tokens` and the four external tokenizers | ⏳    |
-| 3     | Declarations, modifiers, types                            | ⏳    |
-| 4     | Expressions and patterns                                  | ⏳    |
-| 5     | Datalog constraints; whole-corpus parse                   | ⏳    |
-| 6     | Projected trees and the `flix-spec` projection map        | ⏳    |
-| 7     | CodeMirror language package                               | ⏳    |
+| Phase | Delivers                                             | State |
+| ----- | ---------------------------------------------------- | ----- |
+| 1     | Toolchain, docs, digest-pinned `flix-spec` cache     | ✅    |
+| 2     | Lexical layer: `@tokens` and six external tokenizers | ✅    |
+| 3     | Declarations, types, patterns, expressions, Datalog  | ✅    |
+| 4     | Whole-corpus parse                                   | ⏳    |
+| 5     | Projected trees and the `flix-spec` projection map   | ⏳    |
+| 6     | CodeMirror language package                          | ⏳    |
+
+111 of the 116 positive `flix-spec` fixtures parse with no error node. The five that do not are
+listed with a reason in `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, and asserted to still fail,
+so one that starts parsing fails the suite. Deliberate narrowings are separate from those, and are
+recorded in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 
 ## Install
 
@@ -50,7 +54,7 @@ additionally supplies `@codemirror/language`.
 spec.pin.json         # The flix-spec commit and Flix release this repository is measured against
 src/
   flix.grammar        # The Lezer grammar
-  tokens.ts           # External tokenizers: the four constructs a DFA cannot express
+  tokens.ts           # External tokenizers: three lexical, three zero-width lookahead
   highlight.ts        # styleTags — grammar nodes to @lezer/highlight tags
   index.ts            # LRLanguage + CodeMirror extension entry point
   projection.ts       # Lezer tree -> flix-spec canonical projected tree (form: raw)
