@@ -19,3 +19,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+
+  # The docs site is built here rather than only on push to main. test/docs-site.test.ts can
+  # assert what typedoc.json and the workflow say, but not that TypeDoc runs -- and a config that
+  # only breaks at deploy time breaks on the branch nobody is watching.
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run docs:build

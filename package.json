@@ -49,7 +49,6 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs:build": "node --max-old-space-size=8000 scripts/build-grammar.mjs && typedoc",
-    "docs:check": "npm run docs:build",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run build && npm run test",
     "fetch-spec": "node scripts/fetch-spec.mjs",
     "corpus": "node scripts/parse-corpus.mjs",
