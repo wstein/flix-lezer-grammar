@@ -1,5 +1,16 @@
 # flix-lezer-grammar
 
+[![ci](https://img.shields.io/github/actions/workflow/status/wstein/flix-lezer-grammar/ci.yml?branch=main&label=ci)](https://github.com/wstein/flix-lezer-grammar/actions/workflows/ci.yml)
+[![docs](https://img.shields.io/github/actions/workflow/status/wstein/flix-lezer-grammar/docs.yml?branch=main&label=docs)](https://wstein.github.io/flix-lezer-grammar/)
+[![flix](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwstein%2Fflix-lezer-grammar%2Fmain%2Fspec.pin.json&query=%24.flix.tag&label=flix&color=blue)](spec.pin.json)
+[![flix-spec](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwstein%2Fflix-lezer-grammar%2Fmain%2Fspec.pin.json&query=%24.flixSpec.commit&label=flix-spec&color=blue)](https://github.com/wstein/flix-spec)
+[![license](https://img.shields.io/github/license/wstein/flix-lezer-grammar)](LICENSE.md)
+
+Every badge but the licence reads a live source — the workflow's own result, or `spec.pin.json` —
+rather than a number typed into this file. The same reason `docs/CONFORMANCE.md`'s counts are
+asserted by a test: a fact restated by hand drifts from the fact itself, and this repository has
+already had that happen once.
+
 A [Lezer][lezer] grammar for the [Flix][flix] programming language, plus the
 [CodeMirror 6][codemirror] language package built on it — syntax highlighting, folding and
 indentation for the current Flix release, in the browser.
@@ -94,7 +105,7 @@ npm run format      # Prettier, in place
 npm run lint:fix    # ESLint, in place
 npm run fetch-spec  # Materialise .spec/ at the commit in spec.pin.json and verify its digest
 npm run corpus      # Parse an upstream Flix checkout; reports files that fail
-npm run docs:build  # Generate the TypeDoc site in site/
+npm run docs:build  # Generate the TypeDoc site in site/ (published to the docs badge's link)
 ```
 
 ## API and developer documentation
