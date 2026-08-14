@@ -60,6 +60,8 @@ import {
   Semi,
   Slash,
   Star,
+  KeywordForall,
+  KeywordStaticLowercase,
   Tick,
   Tilde,
   lambdaAhead,
@@ -253,8 +255,21 @@ const OPERATORS = trie([
   ["|", Bar],
 ]);
 
+/**
+ * Words the reference lexer turns into keywords that `Parser2` then consumes nowhere: `forall` and
+ * `static` are reserved and unusable, and `fixtures/negative` asserts that a program using either
+ * is rejected. They belong here rather than in an `@specialize` rule because a specialization no
+ * production references is dropped by the generator, which left both words lexing as ordinary
+ * names and this grammar accepting sources the reference rejects.
+ */
+const RESERVED = trie([
+  ["forall", KeywordForall],
+  ["static", KeywordStaticLowercase],
+]);
+
 const alwaysTail = () => true;
 const notUserOp = (ch: number) => !isUserOp(ch);
+const notNameChar = (ch: number) => !isNameChar(ch);
 
 /**
  * Punctuation, fixed operators, user-defined operators, the two arrows and the two dots:
@@ -273,6 +288,14 @@ export const coreTokens = new ExternalTokenizer((input) => {
   if (operator) {
     input.advance(operator.length);
     input.acceptToken(operator.term);
+    return;
+  }
+
+  // Lexer.scala:399 — a keyword only ends where a name would.
+  const reserved = matchTrie(input, RESERVED, notNameChar);
+  if (reserved) {
+    input.advance(reserved.length);
+    input.acceptToken(reserved.term);
     return;
   }
 

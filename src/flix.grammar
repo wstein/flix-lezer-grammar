@@ -111,6 +111,12 @@
   HashCurlyL,
   HashParenL,
   HoleAnonymous,
+  // Reserved and unusable: the reference lexer produces these and Parser2 accepts them nowhere, so
+  // no rule here consumes them either and the generator reports them as unused. That report is the
+  // grammar being right -- a program using one of these words must fail, which is what
+  // fixtures/negative asserts. The same is true of Bang, Caret and Dollar above.
+  KeywordForall,
+  KeywordStaticLowercase,
   Minus,
   ParenL,
   ParenR,
@@ -240,7 +246,6 @@ kwFalse { @specialize[@name=KeywordFalse]<NameLowercase, "false"> }
 kwFix { @specialize[@name=KeywordFix]<NameLowercase, "fix"> }
 kwForA { @specialize[@name=KeywordForA]<NameLowercase, "forA"> }
 kwForM { @specialize[@name=KeywordForM]<NameLowercase, "forM"> }
-kwForall { @specialize[@name=KeywordForall]<NameLowercase, "forall"> }
 kwForce { @specialize[@name=KeywordForce]<NameLowercase, "force"> }
 kwForeach { @specialize[@name=KeywordForeach]<NameLowercase, "foreach"> }
 kwFrom { @specialize[@name=KeywordFrom]<NameLowercase, "from"> }
@@ -280,7 +285,6 @@ kwSealed { @specialize[@name=KeywordSealed]<NameLowercase, "sealed"> }
 kwSelect { @specialize[@name=KeywordSelect]<NameLowercase, "select"> }
 kwSolve { @specialize[@name=KeywordSolve]<NameLowercase, "solve"> }
 kwSpawn { @specialize[@name=KeywordSpawn]<NameLowercase, "spawn"> }
-kwStaticLowercase { @specialize[@name=KeywordStaticLowercase]<NameLowercase, "static"> }
 kwStruct { @specialize[@name=KeywordStruct]<NameLowercase, "struct"> }
 kwSuper { @specialize[@name=KeywordSuper]<NameLowercase, "super"> }
 kwThrow { @specialize[@name=KeywordThrow]<NameLowercase, "throw"> }
@@ -303,8 +307,6 @@ kwUniv { @specialize[@name=KeywordUniv]<NameUppercase, "Univ"> }
 // ---------------------------------------------------------------------------
 // Names
 // ---------------------------------------------------------------------------
-
-Ident { NameLowercase | NameUppercase | NameMath | Underscore | GenericOperator }
 
 // Parser2.scala:738 — a qualified name is a run of uppercase segments that may end in one
 // lowercase segment. `sb.append` is the name `sb` followed by a field access, not one name.
