@@ -17,7 +17,7 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
-**Oracle lane: 114 of 116 fixtures match the reference tree node for node.** They are pinned by name
+**Oracle lane: 115 of 116 fixtures match the reference tree node for node.** They are pinned by name
 in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
 fixture stops matching. The list only moves up.
 
@@ -29,12 +29,10 @@ fail — so a gap that starts parsing fails the suite and has to be taken off th
 
 All 116 parse with no error node; `KNOWN_GAPS` in `test/parse-fixtures.test.ts` is empty.
 
-Two still differ in shape. One is a `select` term list whose parentheses the reference holds
-directly, which needs `select` to have an operand class without the parenthesised forms — a
-duplicated operand layer, and duplicating those is what has driven the tables past building before.
-The other may not be reachable from a Lezer grammar at all: the reference splits a run of comments
-across two `CommentList`s at a node boundary, and skipped tokens here all attach to the node the run
-started in.
+One still differs, and it may not be reachable from a Lezer grammar at all: the reference splits a
+run of comments across two `CommentList`s at a node boundary, and skipped tokens here all attach to
+the node the run started in. Either the projector splits runs at boundaries, or this becomes a
+stated divergence.
 
 Those are defects to fix, not divergences. The divergences are below.
 

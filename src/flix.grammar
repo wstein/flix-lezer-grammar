@@ -916,9 +916,22 @@ ExprFixpointQuery {
 // following `where` then belongs to either the inner or the outer one. `where` itself has no such
 // problem — nothing can follow it that a nested query could also claim — so it takes the full
 // Expr grammar, which is what `where x < y` needs.
-// One operand class, not two: a separate wrapper for the select operand would leave the parser
-// unable to say which of them a fixpointOperand reduces to.
-ExprFixpointSelect { kwSelect FixpointExpr }
+// Parser2 splits the select clause on lookahead: a `(` opens a term list, anything else is a
+// single expression. The reference holds that list's parentheses directly, so the bare form needs
+// an operand class with no parenthesised alternatives -- otherwise `select (x, y)` reduces to a
+// tuple and the parentheses end up one level too deep.
+ExprFixpointSelect {
+  kwSelect ParenL commaSep<FixpointExpr> ParenR |
+  kwSelect SelectExpr
+}
+SelectExpr[@name=Expr] { selectOperand }
+selectOperand {
+  ExprQName |
+  ExprBlock |
+  ExprFixpointConstraintSet |
+  literal |
+  ExprApply { SelectExpr !postfix ArgumentList }
+}
 ExprFixpointFromFragment { kwFrom PredicateAtom (fixpointCommaAhead Comma PredicateAtom)* }
 ExprFixpointWhere { kwWhere Expr }
 ExprFixpointSelectHead[@name=ExprFixpointSelect] { kwSelect PredicateHead }

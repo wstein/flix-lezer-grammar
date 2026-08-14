@@ -24,6 +24,7 @@ const MATCHING = [
   "datalog__open-schema-type-with-a-row-variable.flix",
   "datalog__provenance-solve-and-query.flix",
   "datalog__query-piped-into-a-function.flix",
+  "datalog__query-with-a-where-clause.flix",
   "datalog__query-with-select-and-from.flix",
   "datalog__schema-type.flix",
   "datalog__solve-and-project.flix",
