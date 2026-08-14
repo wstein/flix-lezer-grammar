@@ -58,10 +58,16 @@ describe("oracle lane", () => {
   });
 
   it("matches the reference tree for every fixture but the accepted divergences", () => {
-    writeFileSync(
-      "/tmp/oracle-lane.json",
-      JSON.stringify({ total: results.length, failing: results.filter((r) => r.diff) }, null, 2),
-    );
+    // Every difference in this lane was diagnosed from this report, so the capability stays — but
+    // behind a variable rather than writing a fixed shared path on every run, where two runs at
+    // once would overwrite each other and nothing in the suite reads the result anyway.
+    const report = process.env.ORACLE_LANE_REPORT;
+    if (report) {
+      writeFileSync(
+        report,
+        JSON.stringify({ total: results.length, failing: results.filter((r) => r.diff) }, null, 2),
+      );
+    }
     const differing = results
       .filter((r) => r.diff)
       .map((r) => r.name)

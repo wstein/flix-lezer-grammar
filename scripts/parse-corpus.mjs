@@ -41,6 +41,36 @@ const NOT_VALID_FLIX = new Map([
   ],
 ]);
 
+const USAGE = `usage: parse-corpus [--limit N] [--json PATH]
+
+  --limit N    parse only the first N files, for a quick pass while iterating
+  --json PATH  write the full result, including every failure, to PATH`;
+
+function fail(message) {
+  console.error(`${message}\n\n${USAGE}`);
+  process.exit(2);
+}
+
+/** Rejects an unknown or incomplete option up front rather than at the point it is first used. */
+function parseArgs(argv) {
+  const options = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--limit") {
+      const value = Number(argv[++i]);
+      if (!Number.isInteger(value) || value < 1) fail(`--limit needs a positive integer`);
+      options.limit = value;
+    } else if (arg === "--json") {
+      const value = argv[++i];
+      if (!value || value.startsWith("--")) fail("--json needs a path");
+      options.json = value;
+    } else {
+      fail(`unknown argument: ${arg}`);
+    }
+  }
+  return options;
+}
+
 function git(args, cwd) {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -109,10 +139,10 @@ async function main() {
   const { upstream, counts } = JSON.parse(readFileSync(specCorpus, "utf8"));
   ensureCheckout(upstream.commit, upstream.treeHash);
 
-  const { parser } = await import(built);
   const argv = process.argv.slice(2);
-  const limitAt = argv.indexOf("--limit");
-  const jsonAt = argv.indexOf("--json");
+  const options = parseArgs(argv);
+
+  const { parser } = await import(built);
 
   let files = flixFiles(corpusDir).sort();
   if (files.length !== counts.totalFlixFiles) {
@@ -121,7 +151,7 @@ async function main() {
     );
     process.exit(1);
   }
-  if (limitAt !== -1) files = files.slice(0, Number(argv[limitAt + 1]));
+  if (options.limit !== undefined) files = files.slice(0, options.limit);
 
   const failures = [];
   const started = Date.now();
@@ -163,11 +193,8 @@ async function main() {
     for (const p of missing) console.log(`  ${p}`);
   }
 
-  if (jsonAt !== -1) {
-    writeFileSync(
-      argv[jsonAt + 1],
-      `${JSON.stringify({ total: files.length, failures }, null, 2)}\n`,
-    );
+  if (options.json) {
+    writeFileSync(options.json, `${JSON.stringify({ total: files.length, failures }, null, 2)}\n`);
   }
 
   process.exit(unexpected.length || missing.length ? 1 : 0);
