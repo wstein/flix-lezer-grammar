@@ -8,6 +8,7 @@
 // Targets the current Flix release only. No dialects, no retired syntax.
 
 @precedence {
+  indexAssign @left,
   invokeMethod @left,
   postfix @left,
   not @right,
@@ -465,7 +466,13 @@ TraitConstraint { QName BracketL type BracketR }
 
 // commaSep1, not commaSep: an empty `where` is meaningless, and admitting it makes
 // `where { ... }` ambiguous between no constraints and one record-type constraint.
-DeclEqualityConstraintList { kwWhere commaSep1<DeclEqualityConstraintFragment> }
+// The separating comma belongs to the fragment it follows, so a fragment without one is the last.
+// That is what ends the list; a bare repetition could not tell a following `{` from another
+// fragment starting with a record type.
+DeclEqualityConstraintList {
+  kwWhere DeclEqualityConstraintFragmentSep* DeclEqualityConstraintFragment
+}
+DeclEqualityConstraintFragmentSep[@name=DeclEqualityConstraintFragment] { type Tilde type Comma }
 DeclEqualityConstraintFragment { type Tilde type }
 
 // Parser2.scala:3689 — the reference only accepts a parenthesis before the name; this is the
@@ -546,14 +553,14 @@ TypeCaseSet { AngleL commaSep<QName> AngleR }
 // ---------------------------------------------------------------------------
 
 // Like Expr.Expr, the reference closes a Pattern.Pattern around every pattern.
-Pattern {
+Pattern { patternInner | PatternFCons }
+patternInner {
   PatternVariable |
   PatternLiteral |
   PatternTag |
   PatternTuple |
   PatternRecord |
-  PatternUnary |
-  PatternFCons
+  PatternUnary
 }
 
 PatternVariable { identVariable }
@@ -565,8 +572,11 @@ PatternTagBody { ParenL commaSep<Pattern> ParenR }
 PatternTuple { ParenL commaSep<Pattern> ParenR }
 PatternRecord { CurlyL ~brace commaSep<PatternRecordLabelPattern> (Bar Pattern)? CurlyR }
 PatternRecordLabelPattern { identLower (Equal Pattern)? }
-PatternUnary { Minus literalToken }
-PatternFCons { Pattern !cons ColonColon Pattern }
+PatternUnary { Operator { Minus } literalToken }
+// `close(openBefore(lhs), Pattern.Pattern)` puts the `::` inside the wrapper around the left
+// operand rather than beside it, so the head is a pattern *and* its operator.
+PatternFCons { PatternConsHead Pattern }
+PatternConsHead[@name=Pattern] { patternInner !cons ColonColon }
 
 // ---------------------------------------------------------------------------
 // Literals
@@ -681,7 +691,8 @@ ExprHole { HoleAnonymous }
 ExprHoleNamed { Ident { HoleNamed } }
 ExprHoleVariable { Ident { HoleVariable } }
 ExprStatic { kwStaticUppercase }
-ExprDebug { DebugInterpolator literal }
+ExprDebug { DebugInterpolator DebugBody }
+DebugBody[@name=Expr] { literal }
 
 // Parser2.scala:2086 — `(` opens a parenthesised Expr, a tuple or an ascription, and the
 // reference tells them apart by the token *after* the first Expr: `)` closes a paren, `:`
@@ -705,7 +716,8 @@ operatorToken {
 // follows this head, so the parser takes this branch deterministically instead of carrying a
 // tuple reading alongside it. See src/tokens.ts.
 ExprLambda { lambdaAhead lambdaParams ArrowThinRWhitespace Expr }
-lambdaParams { ParameterList | Parameter }
+lambdaParams { ParameterList | BareParameterList }
+BareParameterList[@name=ParameterList] { Parameter }
 
 ExprBlock { CurlyL ~brace statement CurlyR }
 
@@ -803,7 +815,8 @@ restrictedOperand {
   ExprGetField { RestrictedExpr !postfix Dot identLower }
 }
 
-ExprRun { kwRun RestrictedExpr (!lambda kwWith RestrictedExpr)+ }
+ExprRun { kwRun RestrictedExpr ExprRunWithBodyExpr+ }
+ExprRunWithBodyExpr { !lambda kwWith RestrictedExpr }
 ExprHandler { kwHandler QName HandlerRuleList }
 HandlerRuleList { CurlyL (HandlerRule Comma?)* CurlyR }
 HandlerRule { kwDef identLower ParameterList Equal Expr }
@@ -908,8 +921,10 @@ ExprFixpointQuery {
 ExprFixpointSelect { kwSelect FixpointExpr }
 ExprFixpointFromFragment { kwFrom PredicateAtom (fixpointCommaAhead Comma PredicateAtom)* }
 ExprFixpointWhere { kwWhere Expr }
+ExprFixpointSelectHead[@name=ExprFixpointSelect] { kwSelect PredicateHead }
+ExprFixpointWith { kwWith CurlyL commaSep<identUpper> CurlyR }
 ExprFixpointQueryWithProvenance {
-  kwPQuery fixpointExpressions kwSelect PredicateHead kwWith CurlyL commaSep<identUpper> CurlyR
+  kwPQuery fixpointExpressions ExprFixpointSelectHead ExprFixpointWith
 }
 
 ExprFixpointLambda {
@@ -937,7 +952,9 @@ ExprRecordSelect { Expr !postfix Hash identLower }
 ExprStructGet { Expr !postfix ArrowThinRTight identLower }
 ExprStructPut { Expr !postfix ArrowThinRTight identLower Equal Expr }
 ExprIndex { Expr !postfix BracketL Expr BracketR }
-ExprIndexMut { Expr !postfix BracketL Expr BracketR Equal Expr }
+// The `=` has to outrank reducing the index read, or `(a[0] = 1)` is read as a named tuple
+// element instead of an indexed assignment.
+ExprIndexMut { Expr !postfix BracketL Expr BracketR !indexAssign Equal Expr }
 
 ExprUnary {
   Operator { kwDiscard } !discard Expr |

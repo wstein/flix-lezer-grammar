@@ -68,7 +68,6 @@
     "PatternFCons": "Pattern.FCons",
     "ExprLiteral": "Expr.Literal",
     "ExprStringInterpolation": "Expr.StringInterpolation",
-    "ExprDebug": "Expr.DebugInterpolator",
     "ExprIntrinsic": "Expr.Intrinsic",
     "ExprHole": "Expr.Hole",
     "ExprHoleNamed": "Expr.Hole",
@@ -175,7 +174,9 @@
     "ExprRestrictableChooseStar": "Expr.RestrictableChooseStar",
     "TypeAscribe": "Type.Ascribe",
     "TypePredicateWithAlias": "Type.PredicateWithAlias",
-    "TypePredicateWithTypes": "Type.PredicateWithTypes"
+    "TypePredicateWithTypes": "Type.PredicateWithTypes",
+    "ExprRunWithBodyExpr": "Expr.RunWithBodyExpr",
+    "ExprFixpointWith": "Expr.FixpointWith"
   },
   "recoveryMarkers": ["\u26a0"],
   "notes": {
@@ -194,18 +195,20 @@
     "TypeEffect": "ast/transparency.json elides the reference's Type.Effect, so the expected trees hold the `\\\\` token and the type as siblings; this grammar puts the token outside the node so the same elision applies.",
     "TypeArgument": "ast/transparency.json elides the reference's Type.Argument, so the expected trees hold the type directly inside the argument list.",
     "CommentList": "Built by src/projection.ts, not by the grammar: comments are @skip tokens and Lezer cannot group skipped tokens under a node, so a run of adjacent comment tokens is regrouped at projection time the way Parser2.open() groups them.",
-    "ExprHoleVariable": "ast/transparency.json elides the reference's Expr.HoleVariable, leaving the Ident it wraps."
+    "ExprHoleVariable": "ast/transparency.json elides the reference's Expr.HoleVariable, leaving the Ident it wraps.",
+    "ExprDebug": "The reference holds the `d` token and the string beside each other under the enclosing expression; its own Expr.DebugInterpolator wraps only the string and is elided by ast/transparency.json."
   },
   "flatten": [
-    "EnumBody",
-    "TraitBody",
-    "InstanceBody",
     "EffectBody",
-    "MatchRuleList",
+    "EnumBody",
+    "ExprDebug",
     "ExtMatchRuleList",
-    "HandlerRuleList",
     "ForFragmentList",
-    "ParYieldFragmentList"
+    "HandlerRuleList",
+    "InstanceBody",
+    "MatchRuleList",
+    "ParYieldFragmentList",
+    "TraitBody"
   ],
   "ignored": [
     "Argument",
