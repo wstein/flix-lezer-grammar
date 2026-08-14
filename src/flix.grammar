@@ -565,7 +565,11 @@ ExprStringInterpolation {
 // Expressions
 // ---------------------------------------------------------------------------
 
-statement { Expr | ExprStatement }
+statement { Expr | StatementExpr }
+// The reference closes Expr.Expr around a sequence exactly as it does around any other expression,
+// so the wrapper is added here rather than inside Expr, where it would let `a; b` appear in every
+// expression position.
+StatementExpr[@name=Expr] { ExprStatement }
 ExprStatement { Expr !statement Semi statement }
 
 // `run` and `try` have repeated tails. Their operands use a narrow layer: embedding the full
@@ -754,6 +758,7 @@ ExprUnsafe { kwUnsafe type (kwAs type)? ExprBlock }
 // delimited forms, an ascription, and the postfix chain over those. Anything else — an infix
 // application, `if`, a unary operator, `throw` — has to be written in parentheses or a block.
 // Recorded as an intentional divergence in docs/CONFORMANCE.md.
+RestrictedExpr[@name=Expr] { restrictedOperand }
 restrictedOperand {
   literal |
   ExprQName |
@@ -768,17 +773,17 @@ restrictedOperand {
   ExprBlock |
   // `try g() catch { ... }` is a fixture, so the chain has to be here. Built over
   // restrictedOperand rather than Expr, the way fixpointOperand is, so it stays narrow.
-  ExprApply { restrictedOperand !postfix ArgumentList } |
-  ExprInvokeMethod { restrictedOperand !postfix Dot identLower ArgumentList } |
-  ExprGetField { restrictedOperand !postfix Dot identLower }
+  ExprApply { RestrictedExpr !postfix ArgumentList } |
+  ExprInvokeMethod { RestrictedExpr !postfix Dot identLower ArgumentList } |
+  ExprGetField { RestrictedExpr !postfix Dot identLower }
 }
 
-ExprRun { kwRun restrictedOperand (!lambda kwWith restrictedOperand)+ }
+ExprRun { kwRun RestrictedExpr (!lambda kwWith RestrictedExpr)+ }
 ExprHandler { kwHandler QName HandlerRuleList }
 HandlerRuleList { CurlyL (HandlerRule Comma?)* CurlyR }
 HandlerRule { kwDef identLower ParameterList Equal Expr }
 
-ExprTry { kwTry restrictedOperand (!lambda ExprTryCatchBodyFragment)* }
+ExprTry { kwTry RestrictedExpr (!lambda ExprTryCatchBodyFragment)* }
 ExprTryCatchBodyFragment { kwCatch CurlyL (ExprTryCatchRuleFragment Comma?)* CurlyR }
 ExprTryCatchRuleFragment { kwCase identVariable Colon JavaQName ArrowThickR statement }
 ExprThrow { kwThrow !lambda Expr }
@@ -846,10 +851,13 @@ fixpointOperand {
   ExprQName |
   ExprParen |
   ExprBlock |
+  ExprTuple |
+  literal |
   ExprFixpointConstraintSet |
-  ExprApply { fixpointOperand !postfix ArgumentList }
+  ExprApply { FixpointExpr !postfix ArgumentList }
 }
-fixpointExpressions { fixpointOperand (fixpointCommaAhead Comma fixpointOperand)* }
+FixpointExpr[@name=Expr] { fixpointOperand }
+fixpointExpressions { FixpointExpr (fixpointCommaAhead Comma FixpointExpr)* }
 fixpointNames { identUpper (fixpointCommaAhead Comma identUpper)* }
 
 ExprFixpointSolveWithProject {
@@ -868,8 +876,9 @@ ExprFixpointQuery {
 // following `where` then belongs to either the inner or the outer one. `where` itself has no such
 // problem — nothing can follow it that a nested query could also claim — so it takes the full
 // Expr grammar, which is what `where x < y` needs.
-ExprFixpointSelect { kwSelect queryOperand }
-queryOperand { fixpointOperand | ExprTuple | literal }
+// One operand class, not two: a separate wrapper for the select operand would leave the parser
+// unable to say which of them a fixpointOperand reduces to.
+ExprFixpointSelect { kwSelect FixpointExpr }
 ExprFixpointFromFragment { kwFrom PredicateAtom (fixpointCommaAhead Comma PredicateAtom)* }
 ExprFixpointWhere { kwWhere Expr }
 ExprFixpointQueryWithProvenance {
