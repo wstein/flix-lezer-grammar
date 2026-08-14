@@ -8,6 +8,7 @@
 // Targets the current Flix release only. No dialects, no retired syntax.
 
 @precedence {
+  invokeMethod @left,
   postfix @left,
   not @right,
   unarySign @right,
@@ -341,8 +342,9 @@ useOrImport { (UsesOrImportsUse | UsesOrImportsImport) Semi? }
 
 UsesOrImportsUse { kwUse QName (Dot UseOrImportMany)? }
 UsesOrImportsImport { kwImport JavaQName (Dot UseOrImportMany)? }
-UseOrImportMany { CurlyL commaSep<UsesOrImportsAlias> CurlyR }
-UsesOrImportsAlias { identDefinition (ArrowThickR identDefinition)? }
+UseOrImportMany { CurlyL commaSep<aliasedName> CurlyR }
+aliasedName { identDefinition | UsesOrImportsAlias }
+UsesOrImportsAlias { identDefinition ArrowThickR identDefinition }
 
 // ---------------------------------------------------------------------------
 // Declarations
@@ -460,8 +462,10 @@ KindArrow { Kind !typeArrow ArrowThinRWhitespace Kind }
 // ---------------------------------------------------------------------------
 
 // Parser2.scala:3630 — `a -> b \ ef` attaches the effect to the arrow's result.
-typeAndEffect { type (!typeEffect TypeEffect)? }
-TypeEffect { Backslash type }
+typeAndEffect { type (!typeEffect Backslash TypeEffect)? }
+// The `\` sits beside this node, not inside it: ast/transparency.json elides Type.Effect, which
+// it could only do if the node held one child, and the expected trees show the token as a sibling.
+TypeEffect { type }
 
 type {
   TypeVariable |
@@ -481,7 +485,7 @@ type {
 }
 
 TypeName { identTypeName (Dot identTypeName)* }
-TypeVariable { Ident { NameLowercase | NameMath | Underscore } }
+TypeVariable { NameLowercase | NameMath | Underscore }
 TypeConstant { kwUniv | kwTrue | kwFalse }
 
 TypeApply { type !typeApply TypeArgumentList }
@@ -619,6 +623,7 @@ expressionOperand {
   ExprLiteralSet |
   ExprLiteralMap |
   ExprCheckedTypeCast |
+  ExprCheckedEffectCast |
   ExprUncheckedCast |
   ExprUnsafe |
   ExprHandler |
@@ -745,7 +750,8 @@ ExprLiteralMap { MapHash CurlyL commaSep<ExprLiteralMapKeyValue> CurlyR }
 ExprLiteralMapKeyValue { Expr ArrowThickR Expr }
 ScopeName { At Expr }
 
-ExprCheckedTypeCast { (kwCheckedCast | kwCheckedECast) ParenL Expr ParenR }
+ExprCheckedTypeCast { kwCheckedCast ParenL Expr ParenR }
+ExprCheckedEffectCast { kwCheckedECast ParenL Expr ParenR }
 ExprUncheckedCast {
   kwUncheckedCast ParenL Expr (kwAs typeAndEffect)? ParenR
 }
@@ -774,7 +780,7 @@ restrictedOperand {
   // `try g() catch { ... }` is a fixture, so the chain has to be here. Built over
   // restrictedOperand rather than Expr, the way fixpointOperand is, so it stays narrow.
   ExprApply { RestrictedExpr !postfix ArgumentList } |
-  ExprInvokeMethod { RestrictedExpr !postfix Dot identLower ArgumentList } |
+  ExprInvokeMethod { RestrictedExpr !postfix Dot identLower !invokeMethod ArgumentList } |
   ExprGetField { RestrictedExpr !postfix Dot identLower }
 }
 
@@ -902,7 +908,7 @@ Argument { Expr }
 ArgumentNamed { Expr Equal Expr }
 
 ExprApply { Expr !postfix ArgumentList }
-ExprInvokeMethod { Expr !postfix Dot identLower ArgumentList }
+ExprInvokeMethod { Expr !postfix Dot identLower !invokeMethod ArgumentList }
 ExprGetField { Expr !postfix Dot identLower }
 // Record selection is `r#label`; `.label` is Java field access.
 ExprRecordSelect { Expr !postfix Hash identLower }

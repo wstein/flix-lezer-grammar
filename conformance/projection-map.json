@@ -36,7 +36,6 @@
     "TypeParameterList": "TypeParameterList",
     "TypeParameter": "Parameter",
     "TypeArgumentList": "Type.ArgumentList",
-    "TypeArgument": "Type.Argument",
     "TraitConstraintList": "Type.ConstraintList",
     "TraitConstraint": "Type.Constraint",
     "Kind": "Kind",
@@ -59,7 +58,6 @@
     "TypeExtensible": "Type.Extensible",
     "TypeSchemaTerm": "Type.PredicateWithTypes",
     "TypeCaseSet": "Type.CaseSet",
-    "TypeEffect": "Type.Effect",
     "TypeDerivationList": "Type.DerivationList",
     "PatternLiteral": "Pattern.Literal",
     "PatternTag": "Pattern.Tag",
@@ -165,7 +163,9 @@
     "ExprBinary": "Expr.Binary",
     "Expr": "Expr.Expr",
     "Pattern": "Pattern.Pattern",
-    "KindArrow": "Kind"
+    "KindArrow": "Kind",
+    "ExprCheckedEffectCast": "Expr.CheckedEffectCast",
+    "CommentList": "CommentList"
   },
   "recoveryMarkers": ["\u26a0"],
   "notes": {
@@ -183,7 +183,10 @@
     "Argument": "ast/transparency.json elides the reference's Argument, so the expected trees have the expression directly under the argument list; this one is declared transparent to match.",
     "Pattern": "The pattern counterpart of Expr: the reference closes Pattern.Pattern around every pattern.",
     "PatternVariable": "ast/transparency.json elides the reference's Pattern.Variable, leaving the Ident directly under the pattern; this one is declared transparent to match.",
-    "TypeParameter": "ast/unattachable.json records that no TreeKind.TypeParameter reference exists in the reference at all -- Parser2 only ever closes TypeParameterList, with Parameter nodes inside it. The canonical kind of the same name can appear in no tree from any input."
+    "TypeParameter": "ast/unattachable.json records that no TreeKind.TypeParameter reference exists in the reference at all -- Parser2 only ever closes TypeParameterList, with Parameter nodes inside it. The canonical kind of the same name can appear in no tree from any input.",
+    "TypeEffect": "ast/transparency.json elides the reference's Type.Effect, so the expected trees hold the `\\\\` token and the type as siblings; this grammar puts the token outside the node so the same elision applies.",
+    "TypeArgument": "ast/transparency.json elides the reference's Type.Argument, so the expected trees hold the type directly inside the argument list.",
+    "CommentList": "Built by src/projection.ts, not by the grammar: comments are @skip tokens and Lezer cannot group skipped tokens under a node, so a run of adjacent comment tokens is regrouped at projection time the way Parser2.open() groups them."
   },
   "flatten": [
     "EnumBody",
@@ -196,5 +199,5 @@
     "ForFragmentList",
     "ParYieldFragmentList"
   ],
-  "ignored": ["Argument", "ExprQName", "KindArrow", "PatternVariable"]
+  "ignored": ["Argument", "ExprQName", "KindArrow", "PatternVariable", "TypeArgument", "TypeEffect"]
 }

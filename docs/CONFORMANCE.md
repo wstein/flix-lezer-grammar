@@ -17,7 +17,7 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
-**Oracle lane: 59 of 116 fixtures match the reference tree node for node.** They are pinned by name
+**Oracle lane: 78 of 116 fixtures match the reference tree node for node.** They are pinned by name
 in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
 fixture stops matching. The list only moves up.
 
@@ -82,6 +82,13 @@ The reference lexer emits a single `Err` token kind for a malformed number, an u
 a free dot and so on, each covering the whole malformed region. This grammar does not model `Err`:
 malformed input goes through Lezer's error recovery instead, which produces a different shape for
 the same input. That difference is confined to the recovery lane, which §1 already does not claim.
+
+### 3.5a Comment grouping is reconstructed at projection time
+
+`Parser2.open()` consumes a run of comments at a node's start into a `CommentList`. Comments are
+`@skip` tokens here, and Lezer cannot group skipped tokens under a node, so `src/projection.ts`
+regroups a maximal run of adjacent comment children into one `CommentList`. It reorders nothing and
+drops nothing; it is the one place the projector builds a node the grammar did not.
 
 ### 3.6 `Expr.Expr` and `Pattern.Pattern` are produced, not declared away
 

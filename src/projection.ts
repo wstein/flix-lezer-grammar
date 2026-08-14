@@ -68,6 +68,45 @@ export const TOOL_VERSION = "1.0.0";
 export const ERROR_NODE = "⚠";
 
 /**
+ * `Parser2.open()` consumes any run of comments at a node's start into a `CommentList`. Comments
+ * are `@skip` tokens here, and Lezer cannot group skipped tokens under a node, so the grouping is
+ * reconstructed at projection time instead: a maximal run of adjacent comment children becomes one
+ * `CommentList`. This regroups tokens the parse already produced, in the order it produced them —
+ * it invents nothing and can lose nothing.
+ */
+const COMMENT_TOKENS = new Set(["CommentLine", "CommentDoc", "CommentBlock"]);
+export const COMMENT_LIST = "CommentList";
+
+function groupComments(children: ProjectedChild[]): ProjectedChild[] {
+  if (!children.some((c) => "token" in c && COMMENT_TOKENS.has(c.token))) return children;
+
+  const grouped: ProjectedChild[] = [];
+  let run: ProjectedToken[] = [];
+  const flush = (): void => {
+    const first = run[0];
+    const last = run[run.length - 1];
+    if (first && last) {
+      grouped.push({
+        kind: COMMENT_LIST,
+        span: { start: first.start, end: last.end },
+        children: [...run],
+      });
+    }
+    run = [];
+  };
+
+  for (const child of children) {
+    if ("token" in child && COMMENT_TOKENS.has(child.token)) run.push(child);
+    else {
+      flush();
+      grouped.push(child);
+    }
+  }
+  flush();
+  return grouped;
+}
+
+/**
  * Maps offsets to 1-indexed line/column. Built once per source rather than per node, since a tree
  * has a node per token and rescanning for each would be quadratic.
  */
@@ -132,7 +171,7 @@ function projectNode(
   return {
     kind: name,
     span: { start: index.positionAt(node.from), end: index.positionAt(node.to) },
-    children,
+    children: groupComments(children),
   };
 }
 
