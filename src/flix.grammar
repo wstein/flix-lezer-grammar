@@ -895,7 +895,8 @@ fixpointOperand {
   ExprTuple |
   literal |
   ExprFixpointConstraintSet |
-  ExprLiteralArray |
+  // Not ExprLiteralArray: it ends in `@ region`, and that trailing expression puts the whole
+  // expression grammar back on the left of the operand list's comma. The others are delimited.
   ExprLiteralVector |
   ExprLiteralList |
   ExprLiteralSet |

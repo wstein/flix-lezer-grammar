@@ -91,6 +91,36 @@ describe("bounded operand layers", () => {
   });
 });
 
+describe("constructs the corpus found", () => {
+  // Each of these parsed in no fixture and failed in real Flix, which is the argument for running
+  // `npm run corpus` and not only the 116 curated files.
+  it.each([
+    // A lone `_` is a parameter. The lambda lookahead required a letter after the optional
+    // leading `_`, so every `_ -> e` in the standard library was read as something else.
+    ["a wildcard lambda parameter", "def f(): Unit = Map.foldRight(_ -> v -> v, m)"],
+    ["two of them", "def f(): Unit = g(k -> _ -> Set.insert(k), s)"],
+    // The `}` of an empty brace pair was taken as a resumption of an interpolated string, and the
+    // scan ran on to the next quote in the file.
+    ["an empty collection before a string", 'def f(): Unit = g(a = Vector#{}, h(""))'],
+    ["an empty map before a string", 'def f(): Unit = g(a = Map#{}, h("x"))'],
+    [
+      "an empty set in an argument",
+      'def f(): Unit = eq(expected = Ok(Set#{}), map(flags, of("")))',
+    ],
+    // `run e with handler H { ... }` is how effects are handled throughout the corpus, and the
+    // handler was not in the operand class `run` accepts.
+    [
+      "a handler as a run operand",
+      "def f(): Unit = run g() with handler H { def op(x, k) = k(x) }",
+    ],
+    // Fixpoint operands richer than a bare name.
+    ["a record select in an inject", "def f(): Unit = inject p#classes into Class/1"],
+    ["a collection literal in an inject", "def f(): Unit = inject Vector#{2, 3} into P/1"],
+  ])("parses %s", (_what, source) => {
+    expect(errorCount(source), source).toBe(0);
+  });
+});
+
 describe("positive fixtures", () => {
   const fixtures = positiveFixtures();
 

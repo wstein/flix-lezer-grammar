@@ -17,6 +17,11 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
+**Corpus: 861 of 874 upstream `.flix` files parse with no error node** (`npm run corpus`, against
+the checkout `corpus/corpus.json` pins by tree hash). Two of the remainder are not valid Flix — the
+reference rejects them too, with the reason recorded in `scripts/parse-corpus.mjs`. The other
+eleven are the operand narrowings of §3.1 and §3.2 meeting code that needs more than they admit.
+
 **Oracle lane: 115 of 116 fixtures match the reference tree node for node.** They are pinned by name
 in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
 fixture stops matching. The list only moves up.
@@ -43,8 +48,8 @@ the suite.
 every repeat, and the tables stop building. Their operand is therefore `restrictedOperand`:
 
 **Permitted** — a literal, a name, an intrinsic, a hole, `Static`, a parenthesised expression, a
-tuple, an ascription, a block, and the postfix chain (application, method invocation, field access)
-over any of those.
+tuple, an ascription, a block, a handler, and the postfix chain (application, method invocation,
+field access) over any of those.
 
 **Not permitted** — an infix application, `if`/`match` and the other control forms, a unary
 operator, `throw`. Each becomes acceptable by wrapping it: `run a + b with g` is rejected,
@@ -58,8 +63,13 @@ The reference accepts the unwrapped forms. Asserted in both directions in
 The operand list of `solve`, `psolve`, `inject`, `query` and `pquery` sits where an enclosing
 argument list also uses commas. A full `expression` on each side of that comma multiplies the state
 count past the point where the tables build, so `fixpointOperand` admits a name, a parenthesised
-expression, a block, a constraint set, and the postfix chain over those. Anything else must be
-parenthesised.
+expression, a tuple, a literal, a block, a constraint set, the four brace-delimited collection
+literals, and the postfix chain — application and record selection — over those. Anything else must
+be parenthesised.
+
+Not `Array#{…} @ rc`, though every other collection literal is admitted: an array literal ends in a
+region expression, and that trailing `expression` puts the whole grammar back on the left of the
+comma. The corpus is what showed both which forms were needed and which one could not be given.
 
 Which of the two readings a given comma has is decided by `fixpointCommaAheadToken`, a zero-width
 lookahead token — see [`ARCHITECTURE.md`](ARCHITECTURE.md).

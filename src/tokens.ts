@@ -436,6 +436,12 @@ export const stringTokens = new ExternalTokenizer((input) => {
   }
 
   if (input.next === Ch.CurlyR) {
+    // `{}` is never a resumption. The parser state at the `}` of `Vector#{}` allows one, because
+    // LR merges that state with the one inside `"${ Vector#{} }"` where a resumption really can
+    // follow; without this guard the scan runs on to the next quote in the file and swallows
+    // everything between. `ExprStringInterpolation` requires a statement between `${` and `}`, so
+    // an empty pair cannot be a hole in this grammar.
+    if (input.peek(-1) === Ch.CurlyL) return;
     input.advance();
     const term = scanStringBody(input);
     // Resuming, the closing quote ends the whole literal rather than starting one.
