@@ -30,14 +30,13 @@ current release is the cheaper and more honest contract.
 | 1     | Toolchain, docs, digest-pinned `flix-spec` cache     | ✅    |
 | 2     | Lexical layer: `@tokens` and six external tokenizers | ✅    |
 | 3     | Declarations, types, patterns, expressions, Datalog  | ✅    |
-| 4     | Whole-corpus parse                                   | ⏳    |
-| 5     | Projected trees and the `flix-spec` projection map   | ⏳    |
-| 6     | CodeMirror language package                          | ⏳    |
+| 4     | Projected trees and the `flix-spec` projection map   | ✅    |
+| 5     | CodeMirror language package                          | ✅    |
+| 6     | Whole-corpus parse                                   | ⏳    |
 
-111 of the 116 positive `flix-spec` fixtures parse with no error node. The five that do not are
-listed with a reason in `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, and asserted to still fail,
-so one that starts parsing fails the suite. Deliberate narrowings are separate from those, and are
-recorded in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
+All 116 positive `flix-spec` fixtures parse with no error node, and 115 of them match the
+reference's own tree node for node. The one that does not is an accepted divergence with a stated
+reason, not a gap — see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 
 ## Install
 
@@ -45,8 +44,21 @@ recorded in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 npm install @wstein/lezer-flix
 ```
 
-`@lezer/lr`, `@lezer/common` and `@lezer/highlight` are peer dependencies; a CodeMirror host
-additionally supplies `@codemirror/language`.
+`@lezer/lr`, `@lezer/common`, `@lezer/highlight` and `@codemirror/language` are peer dependencies.
+
+```js
+import { EditorView, basicSetup } from "codemirror";
+import { flix } from "@wstein/lezer-flix";
+
+new EditorView({
+  doc: 'def main(): Unit \\ IO = println("hello")',
+  extensions: [basicSetup, flix()],
+  parent: document.body,
+});
+```
+
+`flix()` is a `LanguageSupport` with highlighting, folding, indentation and bracket matching. The
+raw `parser` is exported too, for tooling that wants the tree without an editor.
 
 ## Layout
 

@@ -8,5 +8,10 @@ dist/
 # Upstream Flix checkout used by `npm run corpus`; fetched, never committed.
 .corpus/
 
+# Declarations for the virtual modules the lezer Rollup plugin creates, written by
+# scripts/build-grammar.mjs so `tsc` can resolve them. Generated, never committed.
+src/flix.grammar.d.ts
+src/flix.grammar.terms.d.ts
+
 *.tsbuildinfo
 .DS_Store

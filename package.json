@@ -48,11 +48,14 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run build && npm run test",
     "fetch-spec": "node scripts/fetch-spec.mjs",
-    "corpus": "node scripts/parse-corpus.mjs"
+    "corpus": "node scripts/parse-corpus.mjs",
+    "prepare": "npm run build",
+    "pretypecheck": "node --max-old-space-size=8000 scripts/build-grammar.mjs"
   },
   "peerDependencies": {
+    "@codemirror/language": "^6.0.0",
     "@lezer/common": "^1.5.2",
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.10"
@@ -73,6 +76,7 @@
     "eslint": "^10.8.1",
     "prettier": "^3.9.6",
     "rollup": "^4.62.4",
+    "tslib": "^2.8.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"

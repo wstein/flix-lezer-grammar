@@ -12,7 +12,7 @@ shims for retired syntax (`law` and `lawful` are ordinary lowercase names).
 ## Commands
 
 ```sh
-npm run check          # what CI runs: format:check + lint + typecheck + test
+npm run check          # what CI runs: format:check + lint + typecheck + build + test
 npm test               # Vitest; runs `fetch-spec` first via pretest
 npm run fetch-spec     # materialise and verify .spec/ (network on first run)
 npm run build          # lezer-generator + Rollup -> dist/
@@ -43,8 +43,9 @@ Move the pin to a newer Flix release (rewrites `spec.pin.json` from flix-spec's 
 node scripts/fetch-spec.mjs --commit <flix-spec-sha>
 ```
 
-`npm run check` deliberately does **not** run `npm run build`. A green check therefore does not
-mean the grammar compiles — check that separately.
+`npm run build` takes about two and a half minutes, almost all of it generating the parse tables.
+It is part of `npm run check`, so a green check does mean the grammar compiles; use
+`scripts/build-grammar.mjs` while iterating and keep the full check for before a commit.
 
 ## Ground rules
 
@@ -138,18 +139,14 @@ node, and 115 of them match the reference's own tree node for node in the oracle
 `test/conformance.test.ts` reproduces locally. The 116th is an accepted divergence with a stated
 reason, not a gap — see `docs/CONFORMANCE.md` §3.5a.
 
-`npm run build` and `npm run typecheck` are both still red there, for the same single reason:
-`src/index.ts` and `src/projection.ts` do not exist yet, so Rollup has no entry point and `tsc` has
-nothing that resolves `./flix.grammar.terms`.
-
 **`flix.grammar.terms` is not a missing file and must never be committed.** It is a virtual module
 the `lezer()` Rollup plugin generates from `src/flix.grammar` at build time; `vitest.config.ts`
 loads the same plugin, which is why tests can import the grammar directly while `tsc` — which runs
 no bundler — cannot. If making `typecheck` green becomes worthwhile before the entry points land,
 the fix is to emit a declaration for the virtual module, not to check generated code in.
 
-Still to be written: `src/index.ts`, `src/highlight.ts`, `src/projection.ts`,
-`conformance/projection-map.json`, and `scripts/parse-corpus.mjs` (the `npm run corpus` script).
+Still to be written: `scripts/parse-corpus.mjs`, the `npm run corpus` script that parses an
+upstream checkout.
 The divergences the grammar has accumulated are recorded in `docs/CONFORMANCE.md`; add to it
 rather than to a commit message when a new one becomes necessary.
 
