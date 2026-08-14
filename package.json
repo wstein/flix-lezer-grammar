@@ -52,8 +52,8 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run build && npm run test",
     "fetch-spec": "node scripts/fetch-spec.mjs",
     "corpus": "node scripts/parse-corpus.mjs",
-    "prepare": "npm run build",
-    "pretypecheck": "node --max-old-space-size=8000 scripts/build-grammar.mjs"
+    "pretypecheck": "node --max-old-space-size=8000 scripts/build-grammar.mjs",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "@codemirror/language": "^6.0.0",

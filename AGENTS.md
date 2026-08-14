@@ -28,6 +28,10 @@ npx vitest run test/spec-cache.test.ts
 npx vitest run -t "matches the content digest"
 ```
 
+`ORACLE_LANE_REPORT=<path> npx vitest run test/conformance.test.ts` writes the full oracle-lane
+result, every differing fixture with its first difference, to that path. Every difference in that
+lane was diagnosed from it.
+
 Compile the grammar on its own — the fastest loop when working on `src/flix.grammar`, and the
 only way to read a conflict report without a bundler's framing around it:
 
@@ -43,6 +47,10 @@ Move the pin to a newer Flix release (rewrites `spec.pin.json` from flix-spec's 
 ```sh
 node scripts/fetch-spec.mjs --commit <flix-spec-sha>
 ```
+
+`npm run build` runs on `npm pack` and `npm publish` through `prepack`, and deliberately not on
+`npm install` — as a `prepare` script it made every `npm ci`, including each CI job, pay for a
+full build before running anything.
 
 `npm run build` takes about two and a half minutes, almost all of it generating the parse tables.
 It is part of `npm run check`, so a green check does mean the grammar compiles; use

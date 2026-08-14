@@ -1,5 +1,8 @@
 name: documentation
 
+# Deployment only. The docs are *built* on every pull request by the `docs` job in ci.yml, which
+# is where a broken typedoc.json should fail; adding a pull_request trigger here would build them
+# a second time for no extra coverage.
 on:
   push:
     branches: [main]
