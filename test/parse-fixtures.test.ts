@@ -33,10 +33,6 @@ const KNOWN_GAPS = new Map<string, string>([
     "an operator character directly after `->` must keep the arrow out of the token, and the " +
       "core tokenizer's arrow branch does not yet reproduce that",
   ],
-  [
-    "type-kind-ascription.flix",
-    "kind ascriptions in type-parameter position are not wired into the Kind rule",
-  ],
 ]);
 
 describe("fixpoint comma lookahead", () => {

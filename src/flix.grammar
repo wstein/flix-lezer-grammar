@@ -406,7 +406,7 @@ DeclEnum {
 }
 
 DeclRestrictableEnum {
-  prologue !decl kwRestrictable kwEnum identTypeName TypeParameterList
+  prologue !decl kwRestrictable kwEnum identTypeName BracketL Parameter BracketR
   TypeParameterList? CaseBody? TypeDerivationList? EnumBody?
 }
 EnumBody { CurlyL Case* CurlyR }
@@ -424,7 +424,7 @@ StructField { ModifierList identLower Colon type }
 DeclTrait {
   prologue !decl kwTrait identDefinition TypeParameterList TraitConstraintList? TraitBody?
 }
-TraitBody { CurlyL (DeclSignature | DeclAssociatedTypeSig)* CurlyR }
+TraitBody { CurlyL (DeclSignature | DeclAssociatedTypeSig)* prologue CurlyR }
 DeclAssociatedTypeSig {
   prologue kwType identTypeName TypeParameterList? (Colon Kind)? (Equal type)?
 }
@@ -433,17 +433,19 @@ DeclInstance {
   prologue !decl kwInstance QName BracketL type BracketR
   TraitConstraintList? DeclEqualityConstraintList? InstanceBody?
 }
-InstanceBody { CurlyL (DeclDef | DeclRedef | DeclAssociatedTypeDef)* CurlyR }
+InstanceBody { CurlyL (DeclDef | DeclRedef | DeclAssociatedTypeDef)* prologue CurlyR }
 DeclAssociatedTypeDef { prologue kwType identTypeName TypeArgumentList? (Equal type)? }
 
 DeclEffect { prologue !decl kwEff Ident { NameUppercase } EffectBody? }
-EffectBody { CurlyL DeclOp* CurlyR }
+EffectBody { CurlyL DeclOp* prologue CurlyR }
 // Parser2.scala:1339 — an operation takes no effect annotation and no body.
 DeclOp { prologue kwDef identFunction ParameterList? Colon type TraitConstraintList? }
 
 DeclTypeAlias {
-  prologue !decl kwType kwAlias identTypeName TypeParameterList? Equal type
+  prologue !decl kwType kwAlias identTypeName TypeParameterList? Equal typeAliasBody
 }
+typeAliasBody { type | TypeAscribe }
+TypeAscribe { type Colon Kind }
 
 // ---------------------------------------------------------------------------
 // Parameters, constraints, kinds
@@ -468,8 +470,10 @@ DeclEqualityConstraintFragment { type Tilde type }
 
 // Parser2.scala:3689 — the reference only accepts a parenthesis before the name; this is the
 // natural superset, and a kind that parses here but not there is rejected by the compiler anyway.
-Kind { Ident { NameUppercase } | ParenL Kind ParenR | KindArrow }
-KindArrow { Kind !typeArrow ArrowThinRWhitespace Kind }
+Kind {
+  Ident { NameUppercase } (!typeArrow ArrowThinRWhitespace Kind)? |
+  ParenL Kind ParenR
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -485,6 +489,7 @@ type {
   TypeVariable |
   TypeConstant |
   TypeName |
+  TypeStatic |
   TypeTuple |
   TypeRecordRow |
   TypeRecord |
@@ -498,7 +503,8 @@ type {
   TypeBinary
 }
 
-TypeName { identTypeName (Dot identTypeName)* }
+TypeName { Ident { NameUppercase } (Dot Ident { NameUppercase })* }
+TypeStatic[@name=Ident] { kwStaticUppercase }
 TypeVariable { NameLowercase | NameMath | Underscore }
 TypeConstant { kwUniv | kwTrue | kwFalse }
 
@@ -527,12 +533,12 @@ TypeRecord {
 TypeRecordField { identLower Equal type }
 TypeEffectSet { CurlyL commaSep<type> CurlyR }
 
-TypeSchema { HashCurlyL commaSep<TypeSchemaTerm> (Bar type)? CurlyR }
-TypeSchemaRow { HashParenL commaSep<TypeSchemaTerm> (Bar type)? ParenR }
-TypeExtensible { HashBar commaSep<TypeSchemaTerm> (Bar type)? BarHash }
-TypeSchemaTerm {
-  QName (TypeArgumentList | ParenL commaSep<type> (Semi type)? ParenR)?
-}
+TypeSchema { HashCurlyL commaSep<typeSchemaTerm> (Bar identVariable)? CurlyR }
+TypeSchemaRow { HashParenL commaSep<typeSchemaTerm> (Bar identVariable)? ParenR }
+TypeExtensible { HashBar commaSep<typeSchemaTerm> (Bar identVariable)? BarHash }
+TypePredicateWithAlias { QName TypeArgumentList }
+TypePredicateWithTypes { QName (ParenL commaSep<type> (Semi type)? ParenR)? }
+typeSchemaTerm { TypePredicateWithAlias | TypePredicateWithTypes }
 TypeCaseSet { AngleL commaSep<QName> AngleR }
 
 // ---------------------------------------------------------------------------
@@ -673,7 +679,7 @@ ExprQName { QName }
 ExprIntrinsic { BuiltIn }
 ExprHole { HoleAnonymous }
 ExprHoleNamed { Ident { HoleNamed } }
-ExprHoleVariable { HoleVariable }
+ExprHoleVariable { Ident { HoleVariable } }
 ExprStatic { kwStaticUppercase }
 ExprDebug { DebugInterpolator literal }
 
