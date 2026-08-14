@@ -141,6 +141,25 @@ which is how one can tell the original was load bearing.
 So the reference reuses one kind for two productions, and a consumer has to produce both. Doing it
 moved the oracle lane from 3 of 116 fixtures to 27, and `Pattern.Pattern` took it to 36.
 
+### 3.7 Five tokens are produced and accepted nowhere
+
+`Bang`, `Caret`, `Dollar`, `KeywordForall` and `KeywordStaticLowercase` are declared in the core
+tokenizer and consumed by no production. `lezer-generator` reports each as an unused rule on every
+build, and that report is the grammar being correct rather than a defect to clean up.
+
+The reference lexer produces all five; `Parser2` references none of them, at the pinned commit. A
+bare `!`, `^` or `$`, and the words `forall` and `static`, are therefore syntax errors in Flix, and
+they are syntax errors here for the same reason — the token exists and nothing accepts it.
+
+They have to be **external** tokens for that to hold. Lezer's own tokenizer is state-driven, so a
+token no production references cannot be produced at all; an `@specialize` for `static` is dropped
+by the generator, and `static` then lexes as an ordinary name. That is not a hypothetical — it was
+the behaviour here until `e38f093`, and `fixtures/negative` has a case for it.
+
+`test/negative-fixtures.test.ts` asserts every negative fixture is rejected, which is what holds
+this in place. Removing any of the five to silence a warning re-accepts a program the reference
+rejects, and that test is what will say so.
+
 ## 4. What is not a divergence
 
 `Parser2` accepts more than Flix allows and rejects the excess in `Weeder2`, a phase this grammar
