@@ -133,9 +133,10 @@ Flix has three recovery kinds and Lezer has one error node.
 ## State of the work
 
 `main` holds the scaffold only. `wip/lexical-layer` holds the lexical layer and the full grammar.
-Table construction finishes with the 8 GB heap, and 111 of the 116 positive fixtures parse with no
-error node; the eight that do not are listed in `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, each
-with a reason and each asserted to _still_ fail, so one that starts parsing fails the suite.
+Table construction finishes with the 8 GB heap. All 116 positive fixtures parse with no error
+node, and 115 of them match the reference's own tree node for node in the oracle lane, which
+`test/conformance.test.ts` reproduces locally. The 116th is an accepted divergence with a stated
+reason, not a gap — see `docs/CONFORMANCE.md` §3.5a.
 
 `npm run build` and `npm run typecheck` are both still red there, for the same single reason:
 `src/index.ts` and `src/projection.ts` do not exist yet, so Rollup has no entry point and `tsc` has

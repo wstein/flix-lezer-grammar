@@ -29,12 +29,10 @@ fail — so a gap that starts parsing fails the suite and has to be taken off th
 
 All 116 parse with no error node; `KNOWN_GAPS` in `test/parse-fixtures.test.ts` is empty.
 
-One still differs, and it may not be reachable from a Lezer grammar at all: the reference splits a
-run of comments across two `CommentList`s at a node boundary, and skipped tokens here all attach to
-the node the run started in. Either the projector splits runs at boundaries, or this becomes a
-stated divergence.
-
-Those are defects to fix, not divergences. The divergences are below.
+The one that does not is an accepted divergence rather than a defect — comment ownership across a
+node boundary, §3.5a — and it is listed with its reason in `ACCEPTED_DIVERGENCES` in
+`test/conformance.test.ts`. Every other fixture is asserted to match, so a regression there fails
+the suite.
 
 ## 3. Accepted divergences
 
@@ -90,12 +88,35 @@ a free dot and so on, each covering the whole malformed region. This grammar doe
 malformed input goes through Lezer's error recovery instead, which produces a different shape for
 the same input. That difference is confined to the recovery lane, which §1 already does not claim.
 
-### 3.5a Comment grouping is reconstructed at projection time
+### 3.5a Comment runs are regrouped; where the reference splits one is not recoverable
 
-`Parser2.open()` consumes a run of comments at a node's start into a `CommentList`. Comments are
-`@skip` tokens here, and Lezer cannot group skipped tokens under a node, so `src/projection.ts`
-regroups a maximal run of adjacent comment children into one `CommentList`. It reorders nothing and
-drops nothing; it is the one place the projector builds a node the grammar did not.
+`Parser2.open()` takes any run of comments at the node it is opening into a `CommentList`.
+Comments are `@skip` tokens here, and Lezer cannot group skipped tokens under a node, so
+`src/projection.ts` regroups a maximal run of adjacent comment children into one `CommentList`. It
+reorders nothing and drops nothing, and it is the one place the projector builds a node the grammar
+did not.
+
+What it cannot do is reproduce **where** the reference splits a run. `open()` is called as each node
+begins, so a run spanning a declaration boundary is divided between the enclosing node and the
+declaration:
+
+```text
+// a line comment          -> CommentList under Root
+/// a doc comment          -> CommentList under Decl.Def
+//// still a line comment  -> ...the same one
+```
+
+Lezer attaches every skipped token to the node the run started in, so all three arrive under `Root`
+and the projector sees one run where the reference saw two. The split point is a fact about the
+reference's control flow, not about the token stream, and it is not information this tree carries.
+
+Reconstructing it would mean the projector deciding which node a comment belongs to — inventing
+structural attachment rather than regrouping what the parse produced. That is a larger claim than
+this layer should make for one fixture, so `lexical__line-and-doc-comments.flix` is listed in
+`ACCEPTED_DIVERGENCES` in `test/conformance.test.ts` and the limitation is stated here instead.
+
+If corpus measurement later shows boundary-split runs are common enough to matter, the decision is
+worth revisiting; a single fixture is not evidence that it is.
 
 ### 3.6 `Expr.Expr` and `Pattern.Pattern` are produced, not declared away
 
