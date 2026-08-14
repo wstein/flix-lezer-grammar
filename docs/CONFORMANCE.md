@@ -22,22 +22,17 @@ the checkout `corpus/corpus.json` pins by tree hash). Two of the remainder are n
 reference rejects them too, with the reason recorded in `scripts/parse-corpus.mjs`. The other
 eleven are the operand narrowings of §3.1 and §3.2 meeting code that needs more than they admit.
 
-**Oracle lane: 115 of 116 fixtures match the reference tree node for node.** They are pinned by name
-in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
-fixture stops matching. The list only moves up.
+**Oracle lane: 115 of 116 fixtures match the reference tree node for node.** All 116 parse with no
+error node, and `KNOWN_GAPS` in `test/parse-fixtures.test.ts` is empty. `test/conformance.test.ts`
+recomputes the comparison flix-spec performs, and asserts that the set of fixtures which differ is
+exactly `ACCEPTED_DIVERGENCES` — so a fixture that starts differing fails, and one that stops
+differing fails too and has to come off the list.
 
-The dominant remaining difference is one node, discussed in §3.6.
+The single fixture that differs is an accepted divergence rather than a defect: comment ownership
+across a node boundary, §3.5a.
 
-112 of the 116 positive fixtures parse with no error node. The five that do not are listed in
-`KNOWN_GAPS` in `test/parse-fixtures.test.ts`, each with a reason, and each asserted to _still_
-fail — so a gap that starts parsing fails the suite and has to be taken off the list.
-
-All 116 parse with no error node; `KNOWN_GAPS` in `test/parse-fixtures.test.ts` is empty.
-
-The one that does not is an accepted divergence rather than a defect — comment ownership across a
-node boundary, §3.5a — and it is listed with its reason in `ACCEPTED_DIVERGENCES` in
-`test/conformance.test.ts`. Every other fixture is asserted to match, so a regression there fails
-the suite.
+The two counts above are checked against reality by `test/docs-numbers.test.ts`, because a number
+written in prose drifts from the code the moment either moves, and both of these already had.
 
 ## 3. Accepted divergences
 
@@ -79,8 +74,8 @@ lookahead token — see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 `Parser2` takes the query clauses in the fixed order `select`, `from`, `where`, each optional. This
 grammar keeps that order and requires `where` to come last, because that is what lets a single
 precedence marker settle whether a trailing `where` belongs to the query or to the enclosing
-declaration. `datalog__query-with-a-where-clause.flix` is currently a `KNOWN_GAPS` entry rather
-than a settled divergence.
+declaration. That order is the reference's own, so this is a description of the grammar rather than
+a divergence from it; the entry stays because the reasoning is easy to lose.
 
 ### 3.4 An escaped name keeps its `$`
 
