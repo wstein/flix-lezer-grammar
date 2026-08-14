@@ -341,8 +341,9 @@ UseOrImportList { useOrImport* }
 useOrImport { (UsesOrImportsUse | UsesOrImportsImport) Semi? }
 
 UsesOrImportsUse { kwUse QName (Dot UseOrImportMany)? }
-UsesOrImportsImport { kwImport JavaQName (Dot UseOrImportMany)? }
+UsesOrImportsImport { kwImport JavaQName (Dot ImportMany)? }
 UseOrImportMany { CurlyL commaSep<aliasedName> CurlyR }
+ImportMany { CurlyL commaSep<aliasedName> CurlyR }
 aliasedName { identDefinition | UsesOrImportsAlias }
 UsesOrImportsAlias { identDefinition ArrowThickR identDefinition }
 
@@ -363,7 +364,9 @@ prologue { AnnotationList ModifierList }
 declaration {
   DeclModule |
   DeclDef |
+  DeclRedef |
   DeclEnum |
+  DeclRestrictableEnum |
   DeclStruct |
   DeclTrait |
   DeclInstance |
@@ -376,7 +379,13 @@ DeclModule {
 }
 
 DeclDef {
-  prologue !decl (kwDef | kwRedef) identFunction TypeParameterList? ParameterList
+  prologue !decl kwDef identFunction TypeParameterList? ParameterList
+  Colon typeAndEffect TraitConstraintList? DeclEqualityConstraintList?
+  Equal statement
+}
+
+DeclRedef {
+  prologue !decl kwRedef identFunction TypeParameterList? ParameterList
   Colon typeAndEffect TraitConstraintList? DeclEqualityConstraintList?
   Equal statement
 }
@@ -392,7 +401,12 @@ DeclSignature {
 // parameters, so the two bracket lists have to be told apart by the keyword rather than by shape.
 DeclEnum {
   prologue !decl
-  (kwEnum identTypeName | kwRestrictable kwEnum identTypeName TypeParameterList)
+  kwEnum identTypeName
+  TypeParameterList? CaseBody? TypeDerivationList? EnumBody?
+}
+
+DeclRestrictableEnum {
+  prologue !decl kwRestrictable kwEnum identTypeName TypeParameterList
   TypeParameterList? CaseBody? TypeDerivationList? EnumBody?
 }
 EnumBody { CurlyL Case* CurlyR }
@@ -419,7 +433,7 @@ DeclInstance {
   prologue !decl kwInstance QName BracketL type BracketR
   TraitConstraintList? DeclEqualityConstraintList? InstanceBody?
 }
-InstanceBody { CurlyL (DeclDef | DeclAssociatedTypeDef)* CurlyR }
+InstanceBody { CurlyL (DeclDef | DeclRedef | DeclAssociatedTypeDef)* CurlyR }
 DeclAssociatedTypeDef { prologue kwType identTypeName TypeArgumentList? (Equal type)? }
 
 DeclEffect { prologue !decl kwEff Ident { NameUppercase } EffectBody? }
@@ -490,17 +504,17 @@ TypeConstant { kwUniv | kwTrue | kwFalse }
 
 TypeApply { type !typeApply TypeArgumentList }
 
-TypeUnary { (kwNot | Tilde | kwRvnot) !typeUnary type }
+TypeUnary { Operator { kwNot | Tilde | kwRvnot } !typeUnary type }
 
 TypeBinary {
-  type !typeArrow ArrowThinRWhitespace typeAndEffect |
-  type !typeRvAddSub (kwRvadd | kwRvsub) type |
-  type !typeRvAnd kwRvand type |
-  type !typeAdditive (Plus | Minus) type |
-  type !typeIntersection Ampersand type |
-  type !typeXor kwXor type |
-  type !typeOr kwOr type |
-  type !typeAnd kwAnd type
+  type !typeArrow Operator { ArrowThinRWhitespace } typeAndEffect |
+  type !typeRvAddSub Operator { kwRvadd | kwRvsub } type |
+  type !typeRvAnd Operator { kwRvand } type |
+  type !typeAdditive Operator { Plus | Minus } type |
+  type !typeIntersection Operator { Ampersand } type |
+  type !typeXor Operator { kwXor } type |
+  type !typeOr Operator { kwOr } type |
+  type !typeAnd Operator { kwAnd } type
 }
 
 // Parser2.scala:3510 — `()` is the empty record row, never a tuple.
@@ -537,7 +551,7 @@ Pattern {
 }
 
 PatternVariable { identVariable }
-PatternLiteral { literal }
+PatternLiteral { literalToken | ExprStringInterpolation }
 // Parser2.scala:700 — NAME_TAG is uppercase only, which is what tells `let x = ...` (a variable)
 // from `let Foo(x) = ...` (a tag).
 PatternTag { QNameUpper PatternTagBody? }
@@ -545,21 +559,19 @@ PatternTagBody { ParenL commaSep<Pattern> ParenR }
 PatternTuple { ParenL commaSep<Pattern> ParenR }
 PatternRecord { CurlyL ~brace commaSep<PatternRecordLabelPattern> (Bar Pattern)? CurlyR }
 PatternRecordLabelPattern { identLower (Equal Pattern)? }
-PatternUnary { Minus literal }
+PatternUnary { Minus literalToken }
 PatternFCons { Pattern !cons ColonColon Pattern }
 
 // ---------------------------------------------------------------------------
 // Literals
 // ---------------------------------------------------------------------------
 
-literal {
-  ExprLiteral {
-    LiteralInt | LiteralInt8 | LiteralInt16 | LiteralInt32 | LiteralInt64 | LiteralBigInt |
-    LiteralFloat | LiteralFloat32 | LiteralFloat64 | LiteralBigDecimal |
-    LiteralChar | LiteralRegex | LiteralString | kwTrue | kwFalse | kwNull
-  } |
-  ExprStringInterpolation
+literalToken {
+  LiteralInt | LiteralInt8 | LiteralInt16 | LiteralInt32 | LiteralInt64 | LiteralBigInt |
+  LiteralFloat | LiteralFloat32 | LiteralFloat64 | LiteralBigDecimal |
+  LiteralChar | LiteralRegex | LiteralString | kwTrue | kwFalse | kwNull
 }
+literal { ExprLiteral { literalToken } | ExprStringInterpolation }
 
 ExprStringInterpolation {
   (LiteralStringInterpolationL statement)+ LiteralStringInterpolationR
@@ -612,8 +624,10 @@ expressionOperand {
   ExprExtMatch |
   ExprLambdaExtMatch |
   ExprRestrictableChoose |
+  ExprRestrictableChooseStar |
   ExprExtTag |
   ExprOpenVariant |
+  ExprOpenVariantAs |
   ExprForeach |
   ExprForMonadic |
   ExprForApplicative |
@@ -630,7 +644,8 @@ expressionOperand {
   ExprThrow |
   ExprNew |
   ExprInvokeConstructor |
-  ExprInvokeSuper |
+  ExprInvokeSuperConstructor |
+  ExprInvokeSuperMethod |
   ExprSpawn |
   ExprParYield |
   ExprSelect |
@@ -657,7 +672,7 @@ expressionOperand {
 ExprQName { QName }
 ExprIntrinsic { BuiltIn }
 ExprHole { HoleAnonymous }
-ExprHoleNamed { HoleNamed }
+ExprHoleNamed { Ident { HoleNamed } }
 ExprHoleVariable { HoleVariable }
 ExprStatic { kwStaticUppercase }
 ExprDebug { DebugInterpolator literal }
@@ -689,16 +704,15 @@ lambdaParams { ParameterList | Parameter }
 ExprBlock { CurlyL ~brace statement CurlyR }
 
 ExprRecordOperation {
-  CurlyL ~brace commaSep<RecordOp> (Bar Expr)? CurlyR
+  CurlyL ~brace commaSep<recordOp> (Bar Expr)? CurlyR
 }
 // Parser2.scala:1615 — `{` opens a block, a record literal or a record operation, and the
 // reference needs two non-comment tokens to tell them apart. The markers let the parser carry both
 // readings for exactly those two tokens.
-RecordOp {
-  Plus ~brace identLower Equal Expr |
-  Minus ~brace identLower |
-  identLower ~brace Equal Expr
-}
+ExprRecordOpExtend { Plus ~brace identLower Equal Expr }
+ExprRecordOpRestrict { Minus ~brace identLower }
+ExprRecordOpUpdate { identLower ~brace Equal Expr }
+recordOp { ExprRecordOpExtend | ExprRecordOpRestrict | ExprRecordOpUpdate }
 
 ExprLetMatch { kwLet Pattern (Colon type)? Equal !statement statement }
 ExprLocalDef {
@@ -721,13 +735,12 @@ ExtMatchRuleList { CurlyL (ExtMatchRule Comma?)* CurlyR }
 ExtMatchRule { kwCase Pattern ArrowThickR statement }
 ExprLambdaExtMatch { kwEMatch matchLambdaAhead Pattern ArrowThinRWhitespace Expr }
 
-ExprRestrictableChoose { (kwChoose | KeywordChooseStar) Expr MatchRuleList }
+ExprRestrictableChoose { kwChoose Expr MatchRuleList }
+ExprRestrictableChooseStar { KeywordChooseStar Expr MatchRuleList }
 
 ExprExtTag { kwXvar Ident { NameUppercase } (!lambda ArgumentList)? }
-ExprOpenVariant {
-  kwOpenVariant QName |
-  kwOpenVariantAs QName Expr
-}
+ExprOpenVariant { kwOpenVariant QName }
+ExprOpenVariantAs { kwOpenVariantAs QName Expr }
 
 ForFragmentList {
   ParenL forFragment (Semi forFragment)* ParenR
@@ -755,7 +768,7 @@ ExprCheckedEffectCast { kwCheckedECast ParenL Expr ParenR }
 ExprUncheckedCast {
   kwUncheckedCast ParenL Expr (kwAs typeAndEffect)? ParenR
 }
-ExprUnsafe { kwUnsafe type (kwAs type)? ExprBlock }
+ExprUnsafe { kwUnsafe type (kwAs type)? CurlyL statement CurlyR }
 
 // The operand layer `run` and `try` share. Both have a repeated tail — `with …` and `catch { … }`
 // — and admitting the whole of `Expr` before a repetition makes the generator carry every
@@ -795,7 +808,7 @@ ExprTryCatchRuleFragment { kwCase identVariable Colon JavaQName ArrowThickR stat
 ExprThrow { kwThrow !lambda Expr }
 
 ExprNew {
-  kwNew type ScopeName CurlyL commaSep<ExprStructPutFieldInit> CurlyR |
+  kwNew type At Expr CurlyL commaSep<ExprStructPutFieldInit> CurlyR |
   kwNew type CurlyL (ExprJvmMethod | ExprJvmConstructor)* CurlyR
 }
 ExprStructPutFieldInit { identLower Equal Expr }
@@ -808,18 +821,20 @@ ExprJvmMethod {
 ExprJvmConstructor { AnnotationList kwDef kwNew ParenL ParenR Colon typeAndEffect Equal statement }
 ExprInvokeConstructor { kwNew type ArgumentList }
 
-ExprInvokeSuper { kwSuper (Dot Ident { NameLowercase | NameUppercase })? ArgumentList }
+ExprInvokeSuperConstructor { kwSuper ArgumentList }
+ExprInvokeSuperMethod { kwSuper Dot Ident { NameLowercase | NameUppercase } ArgumentList }
 
 ExprSpawn { kwSpawn Expr ScopeName }
 ExprParYield { kwPar ParYieldFragmentList? kwYield Expr }
 ParYieldFragmentList { ParenL ParYieldFragment (Semi ParYieldFragment)* ParenR }
 ParYieldFragment { Pattern ArrowThinL Expr }
 
-ExprSelect { kwSelect CurlyL ExprSelectRuleFragment* CurlyR }
+ExprSelect { kwSelect CurlyL selectRule* CurlyR }
 ExprSelectRuleFragment {
-  kwCase identVariable ArrowThinL QName ParenL Expr ParenR ArrowThickR statement |
-  kwCase Ident { Underscore } ArrowThickR statement
+  kwCase identVariable ArrowThinL QName ParenL Expr ParenR ArrowThickR statement
 }
+ExprSelectRuleDefaultFragment { kwCase Underscore ArrowThickR statement }
+selectRule { ExprSelectRuleFragment | ExprSelectRuleDefaultFragment }
 
 ExprUse { (UsesOrImportsUse | UsesOrImportsImport) Semi !statement statement }
 
@@ -892,8 +907,9 @@ ExprFixpointQueryWithProvenance {
 }
 
 ExprFixpointLambda {
-  HashParenL commaSep<PredicateParam> ParenR ArrowThinRWhitespace Expr
+  PredicateParamList ArrowThinRWhitespace Expr
 }
+PredicateParamList { HashParenL commaSep<PredicateParam> ParenR }
 PredicateParam {
   Ident { NameUppercase } (ParenL commaSep<type> (Semi type)? ParenR)?
 }
