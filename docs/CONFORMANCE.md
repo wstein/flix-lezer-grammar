@@ -17,7 +17,7 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
-**Oracle lane: 111 of 116 fixtures match the reference tree node for node.** They are pinned by name
+**Oracle lane: 114 of 116 fixtures match the reference tree node for node.** They are pinned by name
 in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
 fixture stops matching. The list only moves up.
 
@@ -27,11 +27,14 @@ The dominant remaining difference is one node, discussed in §3.6.
 `KNOWN_GAPS` in `test/parse-fixtures.test.ts`, each with a reason, and each asserted to _still_
 fail — so a gap that starts parsing fails the suite and has to be taken off the list.
 
-The five that remain are three parse gaps in `KNOWN_GAPS` (two match-lambda lookaheads and an
-arrow tokenizer), one shape — a `select` term list whose parentheses the reference holds directly —
-and one that may not be reachable from a Lezer grammar at all: the reference splits a run of
-comments across two `CommentList`s at a node boundary, and skipped tokens here all attach to the
-node the run started in.
+All 116 parse with no error node; `KNOWN_GAPS` in `test/parse-fixtures.test.ts` is empty.
+
+Two still differ in shape. One is a `select` term list whose parentheses the reference holds
+directly, which needs `select` to have an operand class without the parenthesised forms — a
+duplicated operand layer, and duplicating those is what has driven the tables past building before.
+The other may not be reachable from a Lezer grammar at all: the reference splits a run of comments
+across two `CommentList`s at a node boundary, and skipped tokens here all attach to the node the run
+started in.
 
 Those are defects to fix, not divergences. The divergences are below.
 

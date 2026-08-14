@@ -18,22 +18,11 @@ function errorCount(source: string): number {
 }
 
 /**
- * Fixtures the reference accepts and this grammar does not, yet. Listed rather than skipped: each
- * entry is asserted to *still* fail, so one that starts parsing fails the suite and has to be
- * taken off the list. Every entry needs a reason, and none of them may be a guess.
+ * Fixtures the reference accepts and this grammar does not. Empty, and meant to stay that way:
+ * every entry is asserted to *still* fail, so one that starts parsing fails the suite and has to
+ * be taken off the list. An entry needs a reason, and none of them may be a guess.
  */
-const KNOWN_GAPS = new Map<string, string>([
-  [
-    "expressions__match-lambda.flix",
-    "matchLambdaAhead does not fire for every pattern head Parser2's detectMatchLambda accepts",
-  ],
-  ["expressions__ext-match-expression-and-lambda.flix", "same as match-lambda, for ematch"],
-  [
-    "lexical__operators-may-follow-an-arrow.flix",
-    "an operator character directly after `->` must keep the arrow out of the token, and the " +
-      "core tokenizer's arrow branch does not yet reproduce that",
-  ],
-]);
+const KNOWN_GAPS = new Map<string, string>();
 
 describe("fixpoint comma lookahead", () => {
   // `fixpointCommaAheadToken` decides whether a `,` continues a fixpoint operand list or closes an

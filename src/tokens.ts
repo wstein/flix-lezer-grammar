@@ -121,6 +121,17 @@ function isUserOp(ch: number): boolean {
   }
 }
 
+/** Lexer.scala:495 — the characters a name may contain after its first. */
+function isNameChar(ch: number): boolean {
+  return (
+    isLetter(ch) ||
+    (ch >= 48 && ch <= 57) ||
+    ch === Ch.Underscore ||
+    ch === 33 /* ! */ ||
+    ch === Ch.Dollar
+  );
+}
+
 /**
  * Java's `Character.isWhitespace`, restricted to what the reference lexer can encounter. Only the
  * decision "is this a space" matters here, never which one.
@@ -496,7 +507,28 @@ function skipTrivia(input: InputStream, offset: number, limit: number): number {
  */
 const MAX_LOOKAHEAD = 8192;
 
-function scanForLambdaHead(input: InputStream, term: number): void {
+function scanForLambdaHead(input: InputStream, term: number, complexHead: boolean): void {
+  // A lambda's head is `(params)` or a single name (Parser2.scala:2037 and 2159). A match
+  // lambda's is a whole pattern, which may be a tag applied to arguments (detectMatchLambda,
+  // Parser2.scala:2317). Without that distinction the lambda scan fires on the `match` of
+  // `match (a, b) -> a + b`, whose head is a keyword and can be no lambda at all.
+  if (!complexHead && input.next !== Ch.ParenL) {
+    let offset = 0;
+    if (input.peek(0) === Ch.Underscore || input.peek(0) === Ch.Dollar) offset++;
+    if (!isLetter(input.peek(offset)) && !isMathName(input.peek(offset))) return;
+    while (isNameChar(input.peek(offset)) || isMathName(input.peek(offset))) offset++;
+    const at = skipTrivia(input, offset, MAX_LOOKAHEAD);
+    if (at < 0) return;
+    if (input.peek(at) !== Ch.Minus || input.peek(at + 1) !== Ch.Gt) return;
+    const after = input.peek(at + 2);
+    if (after >= 0 && isUserOp(after)) return;
+    // Only the spaced arrow forms a lambda; `a->b` is struct field access.
+    const before = input.peek(at - 1);
+    if (!(before < 0 || isWhitespace(before) || after < 0 || isWhitespace(after))) return;
+    input.acceptToken(term, 0);
+    return;
+  }
+
   const first = input.next;
   const opensGroup = first === Ch.ParenL;
   if (!opensGroup && !isLetter(first) && first !== Ch.Underscore && !isMathName(first)) return;
@@ -567,7 +599,7 @@ function scanForLambdaHead(input: InputStream, term: number): void {
 }
 
 export const lambdaAheadToken = new ExternalTokenizer((input) => {
-  scanForLambdaHead(input, lambdaAhead);
+  scanForLambdaHead(input, lambdaAhead, false);
 });
 
 /**
@@ -577,7 +609,7 @@ export const lambdaAheadToken = new ExternalTokenizer((input) => {
  * the choice `Parser2.detectMatchLambda` (Parser2.scala:2317) makes too.
  */
 export const matchLambdaAheadToken = new ExternalTokenizer((input) => {
-  scanForLambdaHead(input, matchLambdaAhead);
+  scanForLambdaHead(input, matchLambdaAhead, true);
 });
 
 export const fixpointCommaAheadToken = new ExternalTokenizer((input) => {
