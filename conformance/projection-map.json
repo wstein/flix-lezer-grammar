@@ -34,7 +34,7 @@
     "ParameterList": "ParameterList",
     "Parameter": "Parameter",
     "TypeParameterList": "TypeParameterList",
-    "TypeParameter": "TypeParameter",
+    "TypeParameter": "Parameter",
     "TypeArgumentList": "Type.ArgumentList",
     "TypeArgument": "Type.Argument",
     "TraitConstraintList": "Type.ConstraintList",
@@ -164,12 +164,13 @@
     "ExprUnary": "Expr.Unary",
     "ExprBinary": "Expr.Binary",
     "Expr": "Expr.Expr",
-    "Pattern": "Pattern.Pattern"
+    "Pattern": "Pattern.Pattern",
+    "KindArrow": "Kind"
   },
   "recoveryMarkers": ["\u26a0"],
   "notes": {
     "JavaQName": "Java-qualified names are parsed by a separate rule because their segment set differs, but the reference builds the same QName node for both.",
-    "KindArrow": "The reference has no separate node for a kind arrow; both spellings close as Kind.",
+    "KindArrow": "Listed in both `ignored` and `mappings`: a kind arrow with one child is transparent, and one with an arrow in it closes as Kind, which is the only kind the reference has here.",
     "ExprHoleNamed": "`?name` and `???` are one TreeKind upstream, distinguished by their token.",
     "\u26a0": "Lezer's single error node. The reference has three recovery kinds, so this is measured in the recovery lane only \u2014 see docs/CONFORMANCE.md.",
     "EnumBody": "The reference has no node for the braces around a group of declarations or rules; the children sit directly under the declaration. Same for the other entries in `flatten`.",
@@ -181,7 +182,8 @@
     "Expr": "The reference closes Expr.Expr around every expression. It is not one of the wrappers ast/transparency.json elides -- at `d\"...\"` it holds the DebugInterpolator token beside its child -- so this grammar produces it rather than declaring it away.",
     "Argument": "ast/transparency.json elides the reference's Argument, so the expected trees have the expression directly under the argument list; this one is declared transparent to match.",
     "Pattern": "The pattern counterpart of Expr: the reference closes Pattern.Pattern around every pattern.",
-    "PatternVariable": "ast/transparency.json elides the reference's Pattern.Variable, leaving the Ident directly under the pattern; this one is declared transparent to match."
+    "PatternVariable": "ast/transparency.json elides the reference's Pattern.Variable, leaving the Ident directly under the pattern; this one is declared transparent to match.",
+    "TypeParameter": "ast/unattachable.json records that no TreeKind.TypeParameter reference exists in the reference at all -- Parser2 only ever closes TypeParameterList, with Parameter nodes inside it. The canonical kind of the same name can appear in no tree from any input."
   },
   "flatten": [
     "EnumBody",

@@ -17,7 +17,7 @@ that are never summed. This repository's position on each:
 
 ## 2. Current state
 
-**Oracle lane: 58 of 116 fixtures match the reference tree node for node.** They are pinned by name
+**Oracle lane: 59 of 116 fixtures match the reference tree node for node.** They are pinned by name
 in `test/conformance.test.ts`, which recomputes the comparison flix-spec performs and fails if a
 fixture stops matching. The list only moves up.
 

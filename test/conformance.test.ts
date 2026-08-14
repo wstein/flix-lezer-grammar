@@ -68,6 +68,7 @@ const MATCHING = [
   "named-arguments.flix",
   "types__case-set-type.flix",
   "types__extensible-schema-type.flix",
+  "types__kind-ascriptions-on-type-parameters.flix",
   "types__schema-row-type.flix",
   "types__tuple-and-unit-types.flix",
 ];

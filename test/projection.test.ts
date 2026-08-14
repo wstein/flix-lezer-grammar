@@ -59,6 +59,21 @@ describe("projection map", () => {
     expect(invented).toEqual([]);
   });
 
+  // Mapping onto a kind that can appear in no tree from any input is always wrong, and is not
+  // caught by checking the kind exists: `TypeParameter` is in ast/treekind.json and is never
+  // constructed. This is the guard for that whole class.
+  it("maps onto no structurally unattachable kind", () => {
+    const unattachable = new Set(
+      (
+        JSON.parse(specFile("ast/unattachable.json")) as { treeKinds: { name: string }[] }
+      ).treeKinds.map((k) => k.name),
+    );
+    const unreachable = [...new Set(Object.values(MAP.mappings))].filter((k) =>
+      unattachable.has(k),
+    );
+    expect(unreachable).toEqual([]);
+  });
+
   it("accounts for every node this grammar can produce", () => {
     const known = new Set([
       ...Object.keys(MAP.mappings),

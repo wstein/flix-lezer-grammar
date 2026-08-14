@@ -14,9 +14,10 @@
       "fixtures/negative",
       "fixtures/expected",
       "fixtures/raw",
-      "ast/transparency.json"
+      "ast/transparency.json",
+      "ast/unattachable.json"
     ],
-    "contentDigest": "72e43b74d801e673e7ace047ae8079367023b9d6ea267d3e7dc8b370cfa098d3"
+    "contentDigest": "81aa04f137b9cb02b60d1c970cb32d904cca10ddd6c8a2587cedb794df2ee22b"
   },
   "flix": {
     "tag": "v0.75.2",
