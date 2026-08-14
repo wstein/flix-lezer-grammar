@@ -15,9 +15,10 @@
       "fixtures/expected",
       "fixtures/raw",
       "ast/transparency.json",
-      "ast/unattachable.json"
+      "ast/unattachable.json",
+      "corpus/corpus.json"
     ],
-    "contentDigest": "81aa04f137b9cb02b60d1c970cb32d904cca10ddd6c8a2587cedb794df2ee22b"
+    "contentDigest": "ed1964e592699aab0481a6344d4758f4331640d224784f477f2e6dd38110abea"
   },
   "flix": {
     "tag": "v0.75.2",

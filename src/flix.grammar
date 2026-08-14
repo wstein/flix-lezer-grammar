@@ -808,6 +808,7 @@ restrictedOperand {
   ExprTuple |
   ExprAscribe |
   ExprBlock |
+  ExprHandler |
   // `try g() catch { ... }` is a fixture, so the chain has to be here. Built over
   // restrictedOperand rather than Expr, the way fixpointOperand is, so it stays narrow.
   ExprApply { RestrictedExpr !postfix ArgumentList } |
@@ -894,7 +895,13 @@ fixpointOperand {
   ExprTuple |
   literal |
   ExprFixpointConstraintSet |
-  ExprApply { FixpointExpr !postfix ArgumentList }
+  ExprLiteralArray |
+  ExprLiteralVector |
+  ExprLiteralList |
+  ExprLiteralSet |
+  ExprLiteralMap |
+  ExprApply { FixpointExpr !postfix ArgumentList } |
+  ExprRecordSelect { FixpointExpr !postfix Hash identLower }
 }
 FixpointExpr[@name=Expr] { fixpointOperand }
 fixpointExpressions { FixpointExpr (fixpointCommaAhead Comma FixpointExpr)* }

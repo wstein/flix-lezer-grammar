@@ -514,9 +514,14 @@ function scanForLambdaHead(input: InputStream, term: number, complexHead: boolea
   // `match (a, b) -> a + b`, whose head is a keyword and can be no lambda at all.
   if (!complexHead && input.next !== Ch.ParenL) {
     let offset = 0;
-    if (input.peek(0) === Ch.Underscore || input.peek(0) === Ch.Dollar) offset++;
-    if (!isLetter(input.peek(offset)) && !isMathName(input.peek(offset))) return;
-    while (isNameChar(input.peek(offset)) || isMathName(input.peek(offset))) offset++;
+    const leading = input.peek(0);
+    if (leading === Ch.Underscore || leading === Ch.Dollar) offset++;
+    if (isLetter(input.peek(offset)) || isMathName(input.peek(offset))) {
+      while (isNameChar(input.peek(offset)) || isMathName(input.peek(offset))) offset++;
+    } else if (leading !== Ch.Underscore) {
+      // A lone `_` is a parameter; a lone `$` is not.
+      return;
+    }
     const at = skipTrivia(input, offset, MAX_LOOKAHEAD);
     if (at < 0) return;
     if (input.peek(at) !== Ch.Minus || input.peek(at + 1) !== Ch.Gt) return;
