@@ -16,6 +16,7 @@ npm run check          # what CI runs: format:check + lint + typecheck + build +
 npm test               # Vitest; runs `fetch-spec` first via pretest
 npm run fetch-spec     # materialise and verify .spec/ (network on first run)
 npm run build          # lezer-generator + Rollup -> dist/
+npm run docs:build     # grammar declarations + TypeDoc -> site/
 npm run format         # Prettier, in place
 npm run lint:fix       # ESLint, in place
 ```
@@ -46,6 +47,9 @@ node scripts/fetch-spec.mjs --commit <flix-spec-sha>
 `npm run build` takes about two and a half minutes, almost all of it generating the parse tables.
 It is part of `npm run check`, so a green check does mean the grammar compiles; use
 `scripts/build-grammar.mjs` while iterating and keep the full check for before a commit.
+
+`npm run docs:build` performs the same grammar-declaration step before generating TypeDoc into the
+gitignored `site/` directory. GitHub Pages deploys that directory from the default branch.
 
 ## Ground rules
 

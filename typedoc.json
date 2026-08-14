@@ -1,0 +1,10 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "site",
+  "name": "Lezer Flix",
+  "readme": "README.md",
+  "projectDocuments": ["docs/*.md"],
+  "includeVersion": true,
+  "githubPages": true
+}

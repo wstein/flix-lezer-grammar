@@ -94,7 +94,14 @@ npm run format      # Prettier, in place
 npm run lint:fix    # ESLint, in place
 npm run fetch-spec  # Materialise .spec/ at the commit in spec.pin.json and verify its digest
 npm run corpus      # Parse an upstream Flix checkout; reports files that fail
+npm run docs:build  # Generate the TypeDoc site in site/
 ```
+
+## API and developer documentation
+
+`npm run docs:build` generates a static TypeDoc site in `site/`. It combines the public package
+API with the repository guides in `docs/`; the published version is deployed to GitHub Pages from
+the default branch. The generated output is disposable and is not committed.
 
 Moving to a newer Flix release means moving the `flix-spec` pin:
 
