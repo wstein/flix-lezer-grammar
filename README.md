@@ -101,7 +101,8 @@ npm run docs:build  # Generate the TypeDoc site in site/
 
 `npm run docs:build` generates a static TypeDoc site in `site/`. It combines the public package
 API with the repository guides in `docs/`; the published version is deployed to GitHub Pages from
-the default branch. The generated output is disposable and is not committed.
+the default branch. The generated output is disposable and is not committed. Before the first
+deployment, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
 
 Moving to a newer Flix release means moving the `flix-spec` pin:
 
