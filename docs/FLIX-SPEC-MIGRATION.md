@@ -71,6 +71,35 @@ between them is only whitespace or the `$` escape. It stands down for consumers 
 New projection-map keys, both optional: `dropWhenEmpty` (the consumer-side counterpart of
 `elide-empty`) and `diagnosticMappings`.
 
+## Adopt 0.77.1, not 0.77.0
+
+`0.77.1` carries the **same upstream pin** as `0.77.0` and is additive for consumers: the three
+vocabularies are unchanged, the report `schemaVersion` stays 7, and both fixture forms keep their
+shape. Pin to it directly.
+
+What it adds:
+
+- **`ast/annotation.json`** — the 16 annotations the reference defines, digest-pinned in `pin.json`.
+  A third vocabulary, because the lexer emits a single `TokenKind.Annotation` for every one of them
+  and the name survives only in the token's `text`, where no `TokenKind` digest can see it change.
+  It is a **coverage** vocabulary and never a validity check: the token is genuinely open, because
+  Java interop annotations lex identically and upstream models exactly that with
+  `Annotation.Error`. 13 of the 16 occur in Flix's own 893-file corpus.
+- **`ast/retired.json`** — vocabulary the reference once defined and has removed, with the tag each
+  went at: `Decl.Law`, `KeywordLaw` and `KeywordLawful`, all gone at v0.75.2. An added kind appears
+  in the inventory under a name you can look up; a removed one leaves only a digest that stopped
+  matching, and this is what survives it.
+- **The fixture suite is 147**, not 146 — one fixture covers the three annotations Flix's own
+  corpus never exercises (`@Deprecated`, `@DontInline`, `@Skip`).
+- **FLIX-0002 in the defect ledger.** flix-spec now runs `Weeder2` over its positive fixtures,
+  advisory only, and the first run found a reference defect: `Parser2` has a dedicated
+  `BinaryOp.NameMath` and lists `NameMath` in `FIRST_BINARY_OP`, so `a ⊆ b` parses cleanly into
+  `Expr.Binary`, while `Weeder2`'s operator match omits `NameMath` and throws
+  `InternalCompilerException`. Confirmed against the released jar, which prints the compiler's own
+  bug-report banner. Nothing is required of a parser — the reference's own parser accepts the input
+  and produces the tree flix-spec publishes — but it bounds what a *positive* fixture means here:
+  it parses, and that is all it promises.
+
 ## What this repository must do
 
 ### 1. Move the pin and the content digest
@@ -78,6 +107,7 @@ New projection-map keys, both optional: `dropWhenEmpty` (the consumer-side count
 `spec.pin.json` carries three things that all move together:
 
 - `flixSpec.commit` — the flix-spec commit `scripts/fetch-spec.mjs` materialises into `.spec/`.
+  For 0.77.1 that is `11072795d7a656d4de308ff057013c41e4245a21` (tag `v0.77.1`).
 - `flixSpec.contentDigest` — a SHA-256 over the sorted (path, content-digest) pairs of the fetched
   subset. **This will change substantially**, not incidentally: `fixtures/expected` is regenerated
   under a contract that removes three times as many nodes, and `fixtures/raw`, `fixtures/positive`
@@ -110,7 +140,7 @@ centrally: four independent consumers reached it, which is why it moved into the
 
 ### 3. Re-measure
 
-The suite goes to **146** fixtures and the canonical trees are much smaller. Every conformance
+The suite goes to **147** fixtures and the canonical trees are much smaller. Every conformance
 number and every fixture-derived expectation in `test/` is stale. Re-run before reading anything as
 a regression.
 
@@ -128,5 +158,5 @@ Add a node for the package segment and map it to `UsesOrImports.Package`, coveri
 
 You emit no diagnostics, so the new lane reports `not-applicable` and will not fail the build. You
 do declare `recoveryMarkers: ["⚠"]`, so you already model Lezer's error nodes — emitting one
-diagnostic per `⚠` node would give accept/reject agreement across all 146 fixtures for very little
+diagnostic per `⚠` node would give accept/reject agreement across all 147 fixtures for very little
 work, and is the only lane that measures error behaviour rather than error *shape*.
