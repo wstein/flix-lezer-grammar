@@ -42,7 +42,7 @@ kinds every structural consumer was already eliding for itself: `Expr.Expr`, `Pa
 `QName`, `UsesOrImports.UseOrImportList`. A third rule, `elide-empty`, drops empty `AnnotationList`
 and `ModifierList` without splicing their tokens.
 
-Normalisation now removes **2285 of 4449 nodes (51.4%)**, up from 753 of 4398 (17.1%). Canonical
+Normalisation now removes **2301 of 4484 nodes (51.3%)**, up from 753 of 4398 (17.1%). Canonical
 trees are substantially smaller and every baseline is stale.
 
 Because the rules fire per occurrence, an elided kind is **not always absent**: `QName` survives
